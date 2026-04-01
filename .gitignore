@@ -1,0 +1,4 @@
+target/
+.watchdog/
+*.log
+.DS_Store
