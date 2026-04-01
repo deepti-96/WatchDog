@@ -1,8 +1,8 @@
-# watchdog
+# WatchDog
 
 Detects deployment-linked regressions in seconds.
 
-`watchdog` is a Rust daemon that answers one question after every deploy: `did this release break something?`
+`WatchDog` is a Rust daemon that answers one question after every deploy: `did this release break something?`
 It correlates a known deploy event with post-deploy changes in error rate and latency, then emits a plain-English verdict with timing and impact details.
 
 ## Why this is a strong Rust project
@@ -51,14 +51,14 @@ flowchart TD
 Run a synthetic bad deploy demo:
 
 ```bash
-cargo run -- simulate --state-dir .watchdog --deploy v1.4.2 --bad-deploy
-cargo run -- run --state-dir .watchdog
+cargo run -- simulate --state-dir .WatchDog --deploy v1.4.2 --bad-deploy
+cargo run -- run --state-dir .WatchDog
 ```
 
 Record a real deploy event:
 
 ```bash
-cargo run -- notify --state-dir .watchdog --deploy v1.4.2 --environment production
+cargo run -- notify --state-dir .WatchDog --deploy v1.4.2 --environment production
 ```
 
 Run benchmark scenarios:
@@ -70,7 +70,7 @@ cargo run -- benchmark --trials 100
 ## Example benchmark output
 
 ```text
-watchdog benchmark summary
+WatchDog benchmark summary
 trials: 100
 healthy false positives: 0
 bad deploys detected: 100
@@ -84,7 +84,7 @@ This benchmark is deterministic and scoped to the built-in synthetic scenarios. 
 
 ## Demo data format
 
-`watchdog` reads and writes JSONL files inside the state directory:
+`WatchDog` reads and writes JSONL files inside the state directory:
 
 - `metrics.jsonl`
 - `deploy-events.jsonl`
@@ -97,7 +97,7 @@ Example metric sample:
 
 ## Integration example
 
-A tiny deploy hook is included at [`examples/deploy.sh`](./examples/deploy.sh). It shows how a deploy pipeline can notify `watchdog` with one line.
+A tiny deploy hook is included at [`examples/deploy.sh`](./examples/deploy.sh). It shows how a deploy pipeline can notify `WatchDog` with one line.
 
 ## What to build next
 
