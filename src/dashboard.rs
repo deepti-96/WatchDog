@@ -118,7 +118,28 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     * { box-sizing: border-box; }
     html { color-scheme: light; }
-    
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(15, 118, 110, 0.16), transparent 24%),
+        radial-gradient(circle at 100% 0%, rgba(153, 27, 27, 0.09), transparent 22%),
+        linear-gradient(180deg, #fbf6ed 0%, var(--bg) 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.26) 45%, transparent 70%),
+        radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 28%);
+      opacity: 0.8;
+    }
 
     button, article, section, input {
       font: inherit;
@@ -149,6 +170,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       background: var(--surface);
       backdrop-filter: blur(18px);
       box-shadow: var(--shadow-lg);
+    }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 28%);
     }
 
     .sidebar,
@@ -227,7 +256,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       gap: 14px;
       padding: 14px 16px;
       border-radius: var(--radius-md);
-      background: rgba(23, 32, 42, 0.94);
+      background: linear-gradient(135deg, rgba(23, 32, 42, 0.94), rgba(15, 118, 110, 0.9));
       color: white;
       box-shadow: var(--shadow-md);
     }
@@ -243,7 +272,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       height: 12px;
       border-radius: 999px;
       background: #7cf2c2;
-      box-shadow: none;
+      box-shadow: 0 0 0 0 rgba(124, 242, 194, 0.45);
+      animation: pulse 2s infinite;
       flex: none;
     }
 
@@ -319,9 +349,27 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .signal-card {
-      background: rgba(255, 255, 255, 0.96);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(251, 247, 240, 0.96));
       position: relative;
       overflow: hidden;
+    }
+
+    .signal-card::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), rgba(15, 118, 110, 0.22));
+    }
+
+    .signal-card.warning::after {
+      background: linear-gradient(90deg, #ea580c, rgba(234, 88, 12, 0.2));
+    }
+
+    .signal-card.danger::after {
+      background: linear-gradient(90deg, #dc2626, rgba(220, 38, 38, 0.2));
     }
 
     .incident-list {
@@ -335,14 +383,16 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       padding: 16px;
       cursor: pointer;
       text-align: left;
-      transition: border-color 180ms ease, background 180ms ease;
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(252, 247, 239, 0.76));
     }
 
     .incident-card:hover,
     .incident-card.active {
+      transform: translateY(-2px);
       border-color: rgba(15, 118, 110, 0.34);
-      background: rgba(230, 247, 244, 0.9);
+      background: linear-gradient(180deg, rgba(230, 247, 244, 0.9), rgba(248, 252, 251, 0.92));
+      box-shadow: 0 18px 32px rgba(15, 118, 110, 0.12);
     }
 
     .incident-card-head {
@@ -591,7 +641,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       content: "";
       position: absolute;
       inset: 0;
-      display: none;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+      animation: shimmer 1.5s infinite;
     }
 
     .skeleton.hero { min-height: 180px; }
