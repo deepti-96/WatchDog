@@ -14,10 +14,20 @@ pub enum Command {
     Run {
         #[arg(long, default_value = ".watchdog")]
         state_dir: PathBuf,
+        #[arg(long)]
+        log_file: Option<PathBuf>,
         #[arg(long, default_value_t = 300)]
         monitoring_window_secs: u64,
         #[arg(long)]
         webhook_url: Option<String>,
+    },
+    Serve {
+        #[arg(long, default_value = ".watchdog")]
+        state_dir: PathBuf,
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
     },
     Notify {
         #[arg(long, default_value = ".watchdog")]

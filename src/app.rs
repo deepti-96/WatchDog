@@ -1,10 +1,13 @@
 use crate::alert;
 use crate::benchmark;
 use crate::cli::{Cli, Command};
+use crate::dashboard;
 use crate::engine::WatchdogEngine;
 use crate::model::{DeployEvent, MetricSample};
+use crate::storage;
+use crate::tail::LogTailer;
 use anyhow::{Context, Result};
-use chrono::{Duration, Utc};
+use chrono::{Duration, SecondsFormat, Utc};
 use clap::Parser;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
@@ -23,9 +26,15 @@ pub async fn run() -> Result<()> {
     match cli.command {
         Command::Run {
             state_dir,
+            log_file,
             monitoring_window_secs,
             webhook_url,
-        } => run_daemon(state_dir, monitoring_window_secs, webhook_url).await,
+        } => run_daemon(state_dir, log_file, monitoring_window_secs, webhook_url).await,
+        Command::Serve {
+            state_dir,
+            host,
+            port,
+        } => dashboard::serve(state_dir, host, port).await,
         Command::Notify {
             state_dir,
             deploy,
@@ -45,6 +54,7 @@ pub async fn run() -> Result<()> {
 
 async fn run_daemon(
     state_dir: PathBuf,
+    log_file: Option<PathBuf>,
     monitoring_window_secs: u64,
     webhook_url: Option<String>,
 ) -> Result<()> {
@@ -54,26 +64,19 @@ async fn run_daemon(
     touch(&metrics_path)?;
     touch(&deploys_path)?;
 
+    let log_path = log_file.unwrap_or_else(|| state_dir.join("app.log"));
+    let mut tailer = LogTailer::new(log_path);
+    tailer.ensure_exists()?;
+
     let mut metric_cursor = 0usize;
     let mut deploy_cursor = 0usize;
     let mut engine = WatchdogEngine::new(120, monitoring_window_secs as i64);
 
     info!("watchdog daemon started");
     info!("state dir: {}", state_dir.display());
+    info!("tailing log file: {}", tailer.path().display());
 
     loop {
-        for deploy in read_new_jsonl::<DeployEvent>(&deploys_path, &mut deploy_cursor)? {
-            if engine.mark_deploy(deploy.clone()) {
-                info!(
-                    "armed deploy correlation for {} with baseline of {} samples",
-                    deploy.deploy_id,
-                    engine.baseline_size()
-                );
-            } else {
-                warn!("ignoring deploy event because baseline is not ready");
-            }
-        }
-
         for sample in read_new_jsonl::<MetricSample>(&metrics_path, &mut metric_cursor)? {
             if let Some(verdict) = engine.ingest_metric(sample) {
                 let message = alert::render(&verdict);
@@ -83,6 +86,25 @@ async fn run_daemon(
                         warn!("failed to send webhook alert: {error:#}");
                     }
                 }
+                if let Err(error) = storage::persist_incident(&state_dir, &verdict, &message) {
+                    warn!("failed to persist incident: {error:#}");
+                }
+            }
+        }
+
+        for log in tailer.read_new_events()? {
+            engine.ingest_log(log);
+        }
+
+        for deploy in read_new_jsonl::<DeployEvent>(&deploys_path, &mut deploy_cursor)? {
+            if engine.mark_deploy(deploy.clone()) {
+                info!(
+                    "armed deploy correlation for {} with baseline of {} samples",
+                    deploy.deploy_id,
+                    engine.baseline_size()
+                );
+            } else {
+                warn!("ignoring deploy event because baseline is not ready");
             }
         }
 
@@ -110,9 +132,15 @@ fn notify(state_dir: PathBuf, deploy: String, environment: String) -> Result<()>
 async fn simulate(state_dir: PathBuf, deploy: String, bad_deploy: bool) -> Result<()> {
     ensure_state_dir(&state_dir)?;
     let metrics_path = state_dir.join("metrics.jsonl");
+    let log_path = state_dir.join("app.log");
     let deploys_path = state_dir.join("deploy-events.jsonl");
+    let incidents_path = state_dir.join("incidents");
     fs::write(&metrics_path, "")?;
+    fs::write(&log_path, "")?;
     fs::write(&deploys_path, "")?;
+    if incidents_path.exists() {
+        fs::remove_dir_all(&incidents_path)?;
+    }
 
     let start = Utc::now();
 
@@ -128,6 +156,9 @@ async fn simulate(state_dir: PathBuf, deploy: String, bad_deploy: bool) -> Resul
         )?;
     }
 
+    println!("baseline metrics written; waiting for watchdog to ingest them...");
+    sleep(TokioDuration::from_millis(1500)).await;
+
     append_jsonl(
         &deploys_path,
         &DeployEvent {
@@ -136,6 +167,9 @@ async fn simulate(state_dir: PathBuf, deploy: String, bad_deploy: bool) -> Resul
             environment: "demo".to_string(),
         },
     )?;
+
+    println!("deploy event written; waiting for watchdog to arm correlation...");
+    sleep(TokioDuration::from_millis(1500)).await;
 
     for i in 32..45 {
         let degraded = bad_deploy && i >= 34;
@@ -148,14 +182,28 @@ async fn simulate(state_dir: PathBuf, deploy: String, bad_deploy: bool) -> Resul
                 request_rate: 405.0,
             },
         )?;
+
+        if degraded {
+            append_log_line(
+                &log_path,
+                &format!(
+                    "{} ERROR api Database timeout for user 123 request 8f91ab22",
+                    (start + Duration::seconds(i)).to_rfc3339_opts(SecondsFormat::Secs, true)
+                ),
+            )?;
+        }
+
+        sleep(TokioDuration::from_millis(120)).await;
     }
 
     println!(
-        "wrote demo data to {} and {}",
+        "wrote demo data to {}, {} and {}",
         metrics_path.display(),
+        log_path.display(),
         deploys_path.display()
     );
     println!("start the daemon with `cargo run -- run --state-dir {}`", state_dir.display());
+    println!("then launch the dashboard with `cargo run -- serve --state-dir {}`", state_dir.display());
     Ok(())
 }
 
@@ -193,6 +241,16 @@ fn append_jsonl<T: serde::Serialize>(path: &Path, value: &T) -> Result<()> {
         .with_context(|| format!("failed to open {}", path.display()))?;
     serde_json::to_writer(&mut file, value)?;
     writeln!(file)?;
+    Ok(())
+}
+
+fn append_log_line(path: &Path, line: &str) -> Result<()> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .with_context(|| format!("failed to open {}", path.display()))?;
+    writeln!(file, "{line}")?;
     Ok(())
 }
 
