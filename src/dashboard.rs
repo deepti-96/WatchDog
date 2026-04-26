@@ -114,6 +114,33 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       --radius-lg: 24px;
       --radius-md: 18px;
       --radius-sm: 14px;
+      --theme-icon: "🌙";
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0d141a;
+      --bg-strong: #121c24;
+      --surface: rgba(17, 28, 36, 0.78);
+      --surface-strong: rgba(24, 37, 48, 0.96);
+      --surface-tint: rgba(18, 30, 39, 0.82);
+      --ink: #eef4f7;
+      --muted: #9ba9b6;
+      --line: rgba(122, 147, 168, 0.22);
+      --line-strong: rgba(140, 168, 191, 0.34);
+      --accent: #54d0c3;
+      --accent-strong: #8be7de;
+      --accent-soft: rgba(84, 208, 195, 0.14);
+      --accent-glow: rgba(84, 208, 195, 0.2);
+      --danger: #ff8f95;
+      --danger-soft: rgba(255, 143, 149, 0.13);
+      --warning: #ffbb7a;
+      --warning-soft: rgba(255, 187, 122, 0.12);
+      --shadow-lg: 0 30px 90px rgba(0, 0, 0, 0.42);
+      --shadow-md: 0 16px 44px rgba(0, 0, 0, 0.28);
+      --shadow-sm: 0 10px 26px rgba(0, 0, 0, 0.2);
+      --focus: #7ae8dc;
+      --theme-icon: "☀";
     }
 
     * { box-sizing: border-box; }
@@ -128,6 +155,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         radial-gradient(circle at 100% 0%, rgba(153, 27, 27, 0.09), transparent 22%),
         linear-gradient(180deg, #fbf6ed 0%, var(--bg) 100%);
       overflow-x: hidden;
+      transition: background 220ms ease, color 220ms ease;
+    }
+
+    html[data-theme="dark"] body {
+      background:
+        radial-gradient(circle at 0% 0%, rgba(84, 208, 195, 0.16), transparent 26%),
+        radial-gradient(circle at 100% 0%, rgba(255, 143, 149, 0.08), transparent 22%),
+        linear-gradient(180deg, #101820 0%, var(--bg) 100%);
     }
 
     body::before {
@@ -139,6 +174,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.26) 45%, transparent 70%),
         radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 28%);
       opacity: 0.8;
+      transition: opacity 220ms ease;
+    }
+
+    html[data-theme="dark"] body::before {
+      opacity: 0.26;
+      background:
+        linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.06) 45%, transparent 72%),
+        radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.08), transparent 28%);
     }
 
     button, article, section, input {
@@ -147,7 +190,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     button:focus-visible,
     article:focus-visible,
-    .refresh-link:focus-visible {
+    .refresh-link:focus-visible,
+    .theme-toggle:focus-visible {
       outline: 3px solid var(--focus);
       outline-offset: 3px;
     }
@@ -170,6 +214,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       background: var(--surface);
       backdrop-filter: blur(18px);
       box-shadow: var(--shadow-lg);
+      transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
     }
 
     .panel::before {
@@ -178,6 +223,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       inset: 0;
       pointer-events: none;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 28%);
+    }
+
+    html[data-theme="dark"] .panel::before {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 28%);
     }
 
     .sidebar,
@@ -235,6 +284,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .subhead {
       color: var(--muted);
       line-height: 1.6;
+      transition: color 220ms ease;
     }
 
     .sidebar-copy {
@@ -247,6 +297,44 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .sidebar-top {
       display: grid;
       gap: 12px;
+    }
+
+    .sidebar-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .theme-toggle {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.46);
+      color: var(--ink);
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: transform 160ms ease, border-color 220ms ease, background 220ms ease, color 220ms ease;
+    }
+
+    .theme-toggle:hover {
+      transform: translateY(-1px) rotate(6deg);
+      border-color: var(--accent);
+    }
+
+    .theme-toggle::before {
+      content: var(--theme-icon);
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    html[data-theme="dark"] .theme-toggle {
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .status-banner {
@@ -709,8 +797,13 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
   <div class="shell">
     <aside class="panel sidebar" aria-label="Incident list">
       <div class="sidebar-top">
-        <div class="eyebrow">Release safety</div>
-        <h1>watchdog</h1>
+        <div class="sidebar-head">
+          <div>
+            <div class="eyebrow">Release safety</div>
+            <h1>watchdog</h1>
+          </div>
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode"></button>
+        </div>
         <p class="sidebar-copy">A Rust incident console that turns deploy regressions into readable evidence. It correlates releases, metric shifts, and new log signatures so developers can understand what changed fast.</p>
       </div>
 
@@ -742,11 +835,40 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
   <script>
     let incidents = [];
     let activeIncidentId = null;
+    const THEME_KEY = 'watchdog-theme';
 
     document.addEventListener('DOMContentLoaded', () => {
+      applySavedTheme();
+      bindThemeToggle();
       renderEmptyDetail();
       loadIncidents();
     });
+
+    function applySavedTheme() {
+      const savedTheme = localStorage.getItem(THEME_KEY);
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = savedTheme || (systemDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    function bindThemeToggle() {
+      const toggle = document.getElementById('theme-toggle');
+      updateThemeToggleLabel(toggle);
+      toggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') || 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem(THEME_KEY, next);
+        updateThemeToggleLabel(toggle);
+      });
+    }
+
+    function updateThemeToggleLabel(toggle) {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('title', label);
+    }
 
     async function loadIncidents() {
       renderIncidentListLoading();
