@@ -460,6 +460,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       background: linear-gradient(90deg, #dc2626, rgba(220, 38, 38, 0.2));
     }
 
+    html[data-theme="dark"] .signal-card {
+      background: linear-gradient(180deg, rgba(24, 37, 48, 0.98), rgba(20, 31, 40, 0.96));
+    }
+
     .incident-list {
       display: grid;
       gap: 12px;
@@ -475,12 +479,21 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(252, 247, 239, 0.76));
     }
 
+    html[data-theme="dark"] .incident-card {
+      background: linear-gradient(180deg, rgba(25, 38, 49, 0.92), rgba(21, 32, 40, 0.88));
+    }
+
     .incident-card:hover,
     .incident-card.active {
       transform: translateY(-2px);
       border-color: rgba(15, 118, 110, 0.34);
       background: linear-gradient(180deg, rgba(230, 247, 244, 0.9), rgba(248, 252, 251, 0.92));
       box-shadow: 0 18px 32px rgba(15, 118, 110, 0.12);
+    }
+
+    html[data-theme="dark"] .incident-card:hover,
+    html[data-theme="dark"] .incident-card.active {
+      background: linear-gradient(180deg, rgba(20, 58, 58, 0.9), rgba(18, 43, 46, 0.92));
     }
 
     .incident-card-head {
@@ -519,6 +532,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .badge.environment { background: rgba(23, 32, 42, 0.07); color: var(--ink); border-color: rgba(23, 32, 42, 0.06); }
     .badge.subtle { background: rgba(15, 118, 110, 0.08); color: var(--accent-strong); }
 
+    html[data-theme="dark"] .badge.environment {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+
     .hero {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -551,7 +569,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       cursor: pointer;
       font-weight: 600;
       text-decoration: none;
-      transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+      transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, color 220ms ease;
     }
 
     .button:hover,
@@ -566,6 +584,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       box-shadow: 0 14px 24px rgba(23, 32, 42, 0.18);
     }
 
+    html[data-theme="dark"] .button-primary {
+      background: linear-gradient(135deg, #dff5f3, #78d6ca);
+      color: #0f1a22;
+    }
+
     .button-primary:disabled {
       opacity: 0.7;
       cursor: wait;
@@ -576,6 +599,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       background: rgba(255, 255, 255, 0.7);
       color: var(--ink);
       border-color: var(--line);
+    }
+
+    html[data-theme="dark"] .button-secondary,
+    html[data-theme="dark"] .refresh-link {
+      background: rgba(255, 255, 255, 0.06);
     }
 
     .refresh-link {
@@ -590,6 +618,17 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .section-card {
       padding: 18px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(251, 247, 239, 0.94));
+    }
+
+    html[data-theme="dark"] .section-card,
+    html[data-theme="dark"] .compare-card,
+    html[data-theme="dark"] .timeline-item,
+    html[data-theme="dark"] .callout,
+    html[data-theme="dark"] pre,
+    html[data-theme="dark"] .empty,
+    html[data-theme="dark"] .mini-card,
+    html[data-theme="dark"] .stat-card {
+      background: linear-gradient(180deg, rgba(24, 37, 48, 0.98), rgba(20, 31, 40, 0.94));
     }
 
     .section-card + .section-card {
@@ -732,6 +771,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       transform: translateX(-100%);
       background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
       animation: shimmer 1.5s infinite;
+    }
+
+    html[data-theme="dark"] .skeleton {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    html[data-theme="dark"] .skeleton::after {
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
     }
 
     .skeleton.hero { min-height: 180px; }
