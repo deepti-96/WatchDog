@@ -145,6 +145,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     * { box-sizing: border-box; }
     html { color-scheme: light; }
+
     body {
       margin: 0;
       min-height: 100vh;
@@ -347,6 +348,22 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       background: linear-gradient(135deg, rgba(23, 32, 42, 0.94), rgba(15, 118, 110, 0.9));
       color: white;
       box-shadow: var(--shadow-md);
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .status-banner::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 10%, rgba(255, 255, 255, 0.14) 46%, transparent 70%);
+      transform: translateX(-100%);
+      animation: sweep 5.4s ease-in-out infinite;
+      z-index: -1;
+    }
+
+    html[data-theme="dark"] .status-banner {
+      background: linear-gradient(135deg, rgba(12, 25, 33, 0.96), rgba(15, 118, 110, 0.88));
     }
 
     .status-banner strong {
@@ -411,6 +428,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       border-radius: var(--radius-lg);
       background: var(--surface-strong);
       box-shadow: var(--shadow-sm);
+      transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease, opacity 240ms ease;
     }
 
     .mini-card,
@@ -785,6 +803,37 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .skeleton.row { min-height: 82px; }
     .skeleton.panel-block { min-height: 210px; }
 
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px) scale(0.985);
+      transition: opacity 560ms ease, transform 560ms cubic-bezier(.2,.7,.2,1);
+      will-change: transform, opacity;
+    }
+
+    .reveal.in-view {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .reveal-delay-1 { transition-delay: 80ms; }
+    .reveal-delay-2 { transition-delay: 140ms; }
+    .reveal-delay-3 { transition-delay: 200ms; }
+
+    .float-accent {
+      position: absolute;
+      width: 240px;
+      height: 240px;
+      border-radius: 999px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 68%);
+      filter: blur(10px);
+      pointer-events: none;
+      z-index: 0;
+      animation: drift 12s ease-in-out infinite;
+    }
+
+    .float-accent.one { top: -60px; right: 8%; }
+    .float-accent.two { bottom: 18%; left: -60px; animation-delay: -4s; }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -807,11 +856,26 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       100% { box-shadow: 0 0 0 0 rgba(124, 242, 194, 0); }
     }
 
+    @keyframes drift {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(0, -12px, 0) scale(1.04); }
+    }
+
+    @keyframes sweep {
+      0%, 100% { transform: translateX(-100%); }
+      50% { transform: translateX(100%); }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation: none !important;
         transition: none !important;
         scroll-behavior: auto !important;
+      }
+
+      .reveal {
+        opacity: 1 !important;
+        transform: none !important;
       }
     }
 
@@ -837,12 +901,15 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       .overview-grid, .sidebar-stats, .compare-grid { grid-template-columns: 1fr; }
       .timeline-item { grid-template-columns: 1fr; }
       .timeline-time, .timeline-content { padding-left: 18px; }
+      .sidebar-head { align-items: center; }
     }
   </style>
 </head>
 <body>
+  <div class="float-accent one" aria-hidden="true"></div>
+  <div class="float-accent two" aria-hidden="true"></div>
   <div class="shell">
-    <aside class="panel sidebar" aria-label="Incident list">
+    <aside class="panel sidebar reveal" aria-label="Incident list">
       <div class="sidebar-top">
         <div class="sidebar-head">
           <div>
@@ -854,7 +921,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         <p class="sidebar-copy">A Rust incident console that turns deploy regressions into readable evidence. It correlates releases, metric shifts, and new log signatures so developers can understand what changed fast.</p>
       </div>
 
-      <section class="status-banner" aria-label="Monitoring status">
+      <section class="status-banner reveal reveal-delay-1" aria-label="Monitoring status">
         <div>
           <strong>Monitoring deploy risk</strong>
           <div class="meta" style="color: rgba(255,255,255,0.82);">Live incident view for deployment-linked regressions</div>
@@ -862,7 +929,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         <span class="pulse-dot" aria-hidden="true"></span>
       </section>
 
-      <section class="sidebar-stats" aria-label="Dashboard summary">
+      <section class="sidebar-stats reveal reveal-delay-2" aria-label="Dashboard summary">
         <article class="mini-card">
           <div class="label">Incidents</div>
           <strong id="incident-count">0</strong>
@@ -873,7 +940,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         </article>
       </section>
 
-      <div id="incident-list" class="incident-list" role="list" aria-label="Incident list"></div>
+      <div id="incident-list" class="incident-list reveal reveal-delay-3" role="list" aria-label="Incident list"></div>
     </aside>
 
     <main class="panel detail" id="detail-panel" aria-live="polite"></main>
@@ -883,39 +950,15 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let incidents = [];
     let activeIncidentId = null;
     const THEME_KEY = 'watchdog-theme';
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     document.addEventListener('DOMContentLoaded', () => {
       applySavedTheme();
       bindThemeToggle();
       renderEmptyDetail();
+      setupRevealObserver();
       loadIncidents();
     });
-
-    function applySavedTheme() {
-      const savedTheme = localStorage.getItem(THEME_KEY);
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = savedTheme || (systemDark ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-
-    function bindThemeToggle() {
-      const toggle = document.getElementById('theme-toggle');
-      updateThemeToggleLabel(toggle);
-      toggle.addEventListener('click', () => {
-        const current = document.documentElement.getAttribute('data-theme') || 'light';
-        const next = current === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem(THEME_KEY, next);
-        updateThemeToggleLabel(toggle);
-      });
-    }
-
-    function updateThemeToggleLabel(toggle) {
-      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-      const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-      toggle.setAttribute('aria-label', label);
-      toggle.setAttribute('title', label);
-    }
 
     async function loadIncidents() {
       renderIncidentListLoading();
@@ -943,6 +986,64 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       }
     }
 
+    function applySavedTheme() {
+      const savedTheme = localStorage.getItem(THEME_KEY);
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = savedTheme || (systemDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    function bindThemeToggle() {
+      const toggle = document.getElementById('theme-toggle');
+      updateThemeToggleLabel(toggle);
+      toggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') || 'light';
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem(THEME_KEY, next);
+        updateThemeToggleLabel(toggle);
+      });
+    }
+
+    function updateThemeToggleLabel(toggle) {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+      toggle.setAttribute('aria-label', label);
+      toggle.setAttribute('title', label);
+    }
+
+    function setupRevealObserver() {
+      if (prefersReducedMotion || !('IntersectionObserver' in window)) {
+        document.querySelectorAll('.reveal').forEach((element) => element.classList.add('in-view'));
+        return;
+      }
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+
+      document.querySelectorAll('.reveal').forEach((element) => observer.observe(element));
+    }
+
+    function activateReveals(scope = document) {
+      const elements = scope.querySelectorAll('.reveal');
+      if (prefersReducedMotion) {
+        elements.forEach((element) => element.classList.add('in-view'));
+        return;
+      }
+
+      elements.forEach((element, index) => {
+        requestAnimationFrame(() => {
+          setTimeout(() => element.classList.add('in-view'), Math.min(index * 40, 180));
+        });
+      });
+    }
+
     function renderSidebarStats() {
       document.getElementById('incident-count').textContent = incidents.length;
       document.getElementById('high-count').textContent = incidents.filter((incident) => incident.severity === 'high').length;
@@ -950,29 +1051,32 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function renderIncidentListLoading() {
       const container = document.getElementById('incident-list');
-      container.innerHTML = Array.from({ length: 3 }).map(() => '<div class="skeleton row" aria-hidden="true"></div>').join('');
+      container.innerHTML = Array.from({ length: 3 }).map((_, index) => `<div class="skeleton row reveal reveal-delay-${Math.min(index + 1, 3)}" aria-hidden="true"></div>`).join('');
+      activateReveals(container);
     }
 
     function renderIncidentListError(error) {
       const container = document.getElementById('incident-list');
-      container.innerHTML = `<div class="empty">Unable to load incidents. ${escapeHtml(error.message || String(error))}</div>`;
+      container.innerHTML = `<div class="empty reveal in-view">Unable to load incidents. ${escapeHtml(error.message || String(error))}</div>`;
     }
 
     function renderIncidentList() {
       const container = document.getElementById('incident-list');
       if (!incidents.length) {
-        container.innerHTML = '<div class="empty">No incidents captured yet. Start the daemon, trigger a deploy, and this list will populate automatically.</div>';
+        container.innerHTML = '<div class="empty reveal in-view">No incidents captured yet. Start the daemon, trigger a deploy, and this list will populate automatically.</div>';
         return;
       }
 
-      container.innerHTML = incidents.map(renderIncidentCard).join('');
+      container.innerHTML = incidents.map((incident, index) => renderIncidentCard(incident, index)).join('');
+      activateReveals(container);
     }
 
-    function renderIncidentCard(incident) {
+    function renderIncidentCard(incident, index) {
       const isActive = incident.id === activeIncidentId;
+      const delayClass = `reveal-delay-${Math.min((index % 3) + 1, 3)}`;
       return `
         <article
-          class="incident-card ${isActive ? 'active' : ''}"
+          class="incident-card reveal ${delayClass} ${isActive ? 'active in-view' : ''}"
           onclick="selectIncident('${incident.id}')"
           onkeydown="handleIncidentKey(event, '${incident.id}')"
           tabindex="0"
@@ -1022,7 +1126,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function renderEmptyDetail() {
       document.getElementById('detail-panel').innerHTML = `
-        <div class="empty">
+        <div class="empty reveal in-view">
           No incidents yet. Run the daemon and trigger a bad deploy simulation to populate the dashboard.
         </div>
       `;
@@ -1031,16 +1135,16 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     function renderDetailLoading() {
       document.getElementById('detail-panel').innerHTML = `
         <div class="loading-state" aria-label="Loading incident details">
-          <div class="skeleton hero"></div>
+          <div class="skeleton hero reveal in-view"></div>
           <div class="overview-grid">
-            <div class="skeleton row"></div>
-            <div class="skeleton row"></div>
-            <div class="skeleton row"></div>
-            <div class="skeleton row"></div>
+            <div class="skeleton row reveal in-view"></div>
+            <div class="skeleton row reveal in-view"></div>
+            <div class="skeleton row reveal in-view"></div>
+            <div class="skeleton row reveal in-view"></div>
           </div>
           <div class="detail-grid">
-            <div class="skeleton panel-block"></div>
-            <div class="skeleton panel-block"></div>
+            <div class="skeleton panel-block reveal in-view"></div>
+            <div class="skeleton panel-block reveal in-view"></div>
           </div>
         </div>
       `;
@@ -1048,7 +1152,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function renderErrorDetail(error) {
       document.getElementById('detail-panel').innerHTML = `
-        <div class="empty">
+        <div class="empty reveal in-view">
           Could not load this incident. ${escapeHtml(error.message || String(error))}
         </div>
       `;
@@ -1066,7 +1170,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           : 'No explanation generated yet. Click "Explain Incident" to get an evidence-grounded summary and debugging steps.';
 
       panel.innerHTML = `
-        <section class="hero">
+        <section class="hero reveal in-view">
           <div class="hero-copy">
             <div class="badge-row">
               ${renderBadge(incident.severity, incident.severity)}
@@ -1083,21 +1187,21 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         </section>
 
         <section class="signal-grid" aria-label="Primary signals">
-          ${renderSignalCard('Detection Delay', `${verdict.seconds_after_deploy}s`, 'Time between deploy and detected regression', 'warning')}
-          ${renderSignalCard('Top Error Signature', signature, verdict.top_error_count ? `Seen ${verdict.top_error_count} times after deploy` : 'No repeated new error count captured', 'danger')}
-          ${renderSignalCard('Requests at Detection', `${comparison.request_rate_at_detection.toFixed(1)} req/s`, 'Traffic volume when the verdict was raised', '')}
+          ${renderSignalCard('Detection Delay', `${verdict.seconds_after_deploy}s`, 'Time between deploy and detected regression', 'warning', 'reveal reveal-delay-1')}
+          ${renderSignalCard('Top Error Signature', signature, verdict.top_error_count ? `Seen ${verdict.top_error_count} times after deploy` : 'No repeated new error count captured', 'danger', 'reveal reveal-delay-2')}
+          ${renderSignalCard('Requests at Detection', `${comparison.request_rate_at_detection.toFixed(1)} req/s`, 'Traffic volume when the verdict was raised', '', 'reveal reveal-delay-3')}
         </section>
 
         <section class="overview-grid" aria-label="Incident overview">
-          ${renderStatCard('Error Rate Delta', verdict.error_rate_delta.toFixed(3))}
-          ${renderStatCard('Latency Delta', `${verdict.latency_delta_ms.toFixed(1)} ms`)}
-          ${renderStatCard('Deploy Time', formatDateTime(verdict.deploy_timestamp))}
-          ${renderStatCard('Detected At', formatDateTime(verdict.detected_at))}
+          ${renderStatCard('Error Rate Delta', verdict.error_rate_delta.toFixed(3), 'reveal reveal-delay-1')}
+          ${renderStatCard('Latency Delta', `${verdict.latency_delta_ms.toFixed(1)} ms`, 'reveal reveal-delay-2')}
+          ${renderStatCard('Deploy Time', formatDateTime(verdict.deploy_timestamp), 'reveal reveal-delay-3')}
+          ${renderStatCard('Detected At', formatDateTime(verdict.detected_at), 'reveal reveal-delay-3')}
         </section>
 
         <section class="detail-grid">
           <div>
-            <article class="section-card">
+            <article class="section-card reveal reveal-delay-1">
               <div class="section-heading">
                 <h3>Before vs After</h3>
                 <span class="muted">Baseline against detected state</span>
@@ -1108,17 +1212,17 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
               </div>
             </article>
 
-            <article class="section-card">
+            <article class="section-card reveal reveal-delay-2">
               <div class="section-heading">
                 <h3>Incident Timeline</h3>
                 <span class="muted">What happened, in order</span>
               </div>
-              <div class="timeline">${verdict.timeline.map(renderTimelineItem).join('')}</div>
+              <div class="timeline">${verdict.timeline.map((event) => renderTimelineItem(event)).join('')}</div>
             </article>
           </div>
 
           <div>
-            <article class="section-card">
+            <article class="section-card reveal reveal-delay-1">
               <div class="section-heading">
                 <h3>Why Watchdog Flagged It</h3>
                 <span class="muted">Detector verdict</span>
@@ -1126,7 +1230,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
               <div class="callout">${escapeHtml(incident.alert_text)}</div>
             </article>
 
-            <article class="section-card">
+            <article class="section-card reveal reveal-delay-2">
               <div class="section-heading">
                 <h3>Dominant Error Signature</h3>
                 <span class="muted">Most repeated new error</span>
@@ -1137,7 +1241,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
               </div>
             </article>
 
-            <article class="section-card">
+            <article class="section-card reveal reveal-delay-3">
               <div class="section-heading">
                 <h3>AI Explanation</h3>
                 <span class="muted">Evidence-grounded summary</span>
@@ -1147,6 +1251,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           </div>
         </section>
       `;
+
+      activateReveals(panel);
     }
 
     async function explainIncident(id) {
@@ -1180,18 +1286,18 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       return `<span class="badge ${kind}">${escapeHtml(label)}</span>`;
     }
 
-    function renderStatCard(label, value) {
+    function renderStatCard(label, value, extraClass = '') {
       return `
-        <article class="stat-card">
+        <article class="stat-card ${extraClass}">
           <div class="label">${escapeHtml(label)}</div>
           <strong>${escapeHtml(value)}</strong>
         </article>
       `;
     }
 
-    function renderSignalCard(label, value, detail, tone) {
+    function renderSignalCard(label, value, detail, tone, extraClass = '') {
       return `
-        <article class="signal-card ${tone}">
+        <article class="signal-card ${tone} ${extraClass}">
           <div class="label">${escapeHtml(label)}</div>
           <strong>${escapeHtml(value)}</strong>
           <p class="meta" style="margin-top: 8px;">${escapeHtml(detail)}</p>
@@ -1201,7 +1307,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function renderCompareCard(title, baseline, detected) {
       return `
-        <div class="compare-card">
+        <div class="compare-card reveal reveal-delay-1">
           <h4>${escapeHtml(title)}</h4>
           <div class="compare-row">
             <span class="row-label muted">Baseline</span>
@@ -1217,7 +1323,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function renderTimelineItem(event) {
       return `
-        <article class="timeline-item">
+        <article class="timeline-item reveal reveal-delay-1">
           <div class="timeline-time">${new Date(event.timestamp).toLocaleTimeString()}</div>
           <div class="timeline-content">
             <strong>${escapeHtml(event.label)}</strong>
