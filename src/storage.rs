@@ -12,14 +12,11 @@ pub fn persist_incident(state_dir: &Path, verdict: &RegressionVerdict, alert_tex
         summary: summary_for(verdict),
         verdict: verdict.clone(),
         alert_text: alert_text.to_string(),
+        cached_explanation: None,
+        cached_explanation_updated_at: None,
     };
 
-    let incidents_dir = incidents_dir(state_dir);
-    fs::create_dir_all(&incidents_dir)
-        .with_context(|| format!("failed to create incidents dir {}", incidents_dir.display()))?;
-    let path = incident_path(state_dir, &incident.id);
-    let file = File::create(&path).with_context(|| format!("failed to create {}", path.display()))?;
-    serde_json::to_writer_pretty(file, &incident)?;
+    write_incident(state_dir, &incident)?;
     Ok(incident)
 }
 
@@ -53,6 +50,27 @@ pub fn read_incident(state_dir: &Path, incident_id: &str) -> Result<Option<Incid
     let file = File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
     let incident = serde_json::from_reader(file)?;
     Ok(Some(incident))
+}
+
+pub fn update_incident_explanation(state_dir: &Path, incident_id: &str, explanation: &str) -> Result<Option<Incident>> {
+    let Some(mut incident) = read_incident(state_dir, incident_id)? else {
+        return Ok(None);
+    };
+
+    incident.cached_explanation = Some(explanation.to_string());
+    incident.cached_explanation_updated_at = Some(Utc::now());
+    write_incident(state_dir, &incident)?;
+    Ok(Some(incident))
+}
+
+fn write_incident(state_dir: &Path, incident: &Incident) -> Result<()> {
+    let incidents_dir = incidents_dir(state_dir);
+    fs::create_dir_all(&incidents_dir)
+        .with_context(|| format!("failed to create incidents dir {}", incidents_dir.display()))?;
+    let path = incident_path(state_dir, &incident.id);
+    let file = File::create(&path).with_context(|| format!("failed to create {}", path.display()))?;
+    serde_json::to_writer_pretty(file, incident)?;
+    Ok(())
 }
 
 fn severity_for(verdict: &RegressionVerdict) -> String {
