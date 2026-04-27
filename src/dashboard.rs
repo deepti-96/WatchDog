@@ -311,6 +311,46 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       gap: 12px;
     }
 
+    .sync-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.52);
+      color: var(--muted);
+      font-size: 0.84rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    html[data-theme="dark"] .sync-bar {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .sync-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sync-state::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(15, 118, 110, 0.24);
+      animation: pulse 2.2s infinite;
+    }
+
+    .sync-state.paused::before {
+      background: var(--warning);
+      animation: none;
+      box-shadow: none;
+    }
+
     .sidebar-head {
       display: flex;
       justify-content: space-between;
@@ -962,6 +1002,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         <p class="sidebar-copy">A Rust incident console that turns deploy regressions into readable evidence. It correlates releases, metric shifts, and new log signatures so developers can understand what changed fast.</p>
       </div>
 
+      <section class="sync-bar reveal reveal-delay-1" aria-label="Dashboard sync status">
+        <div id="sync-state" class="sync-state">Auto-refresh on</div>
+        <div id="sync-time">Waiting for first sync</div>
+      </section>
+
       <section class="status-banner reveal reveal-delay-1" aria-label="Monitoring status">
         <div>
           <strong>Monitoring deploy risk</strong>
@@ -1006,6 +1051,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let activeIncidentId = null;
     let searchQuery = '';
     let severityFilter = 'all';
+    let lastSyncedAt = null;
     const THEME_KEY = 'watchdog-theme';
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -1026,8 +1072,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           throw new Error(await response.text());
         }
         incidents = await response.json();
+        lastSyncedAt = new Date();
         renderSidebarStats();
         renderIncidentList();
+        renderSyncStatus();
 
         if (incidents.length) {
           const nextId = activeIncidentId && incidents.some((incident) => incident.id === activeIncidentId)
@@ -1038,6 +1086,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           renderEmptyDetail();
         }
       } catch (error) {
+        renderSyncStatus(error.message || String(error));
         renderSidebarStats();
         renderIncidentListError(error);
         renderErrorDetail(error);
@@ -1069,6 +1118,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       toggle.setAttribute('aria-label', label);
       toggle.setAttribute('title', label);
     }
+
+
 
     function setupRevealObserver() {
       if (prefersReducedMotion || !('IntersectionObserver' in window)) {
