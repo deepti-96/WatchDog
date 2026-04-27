@@ -1052,20 +1052,28 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let searchQuery = '';
     let severityFilter = 'all';
     let lastSyncedAt = null;
+    let refreshTimer = null;
+    let isExplainingIncident = false;
     const THEME_KEY = 'watchdog-theme';
+    const REFRESH_INTERVAL_MS = 5000;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     document.addEventListener('DOMContentLoaded', () => {
       applySavedTheme();
       bindThemeToggle();
       bindFilters();
+      bindVisibilityRefresh();
       renderEmptyDetail();
       setupRevealObserver();
       loadIncidents();
+      startAutoRefresh();
     });
 
-    async function loadIncidents() {
-      renderIncidentListLoading();
+    async function loadIncidents(options = {}) {
+      const { silent = false } = options;
+      if (!silent) {
+        renderIncidentListLoading();
+      }
       try {
         const response = await fetch('/api/incidents');
         if (!response.ok) {
@@ -1081,15 +1089,19 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           const nextId = activeIncidentId && incidents.some((incident) => incident.id === activeIncidentId)
             ? activeIncidentId
             : incidents[0].id;
-          await selectIncident(nextId, false);
-        } else {
+          if (!isExplainingIncident) {
+            await selectIncident(nextId, false, silent);
+          }
+        } else if (!silent) {
           renderEmptyDetail();
         }
       } catch (error) {
         renderSyncStatus(error.message || String(error));
-        renderSidebarStats();
-        renderIncidentListError(error);
-        renderErrorDetail(error);
+        if (!silent) {
+          renderSidebarStats();
+          renderIncidentListError(error);
+          renderErrorDetail(error);
+        }
       }
     }
 
@@ -1120,6 +1132,46 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
 
+    function bindVisibilityRefresh() {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          loadIncidents({ silent: true });
+        }
+      });
+    }
+
+    function startAutoRefresh() {
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+      }
+
+      refreshTimer = setInterval(() => {
+        if (!document.hidden) {
+          loadIncidents({ silent: true });
+        }
+      }, REFRESH_INTERVAL_MS);
+    }
+
+    function renderSyncStatus(errorMessage = null) {
+      const state = document.getElementById('sync-state');
+      const time = document.getElementById('sync-time');
+      if (!state || !time) {
+        return;
+      }
+
+      if (errorMessage) {
+        state.textContent = 'Auto-refresh paused';
+        state.classList.add('paused');
+        time.textContent = errorMessage;
+        return;
+      }
+
+      state.textContent = 'Auto-refresh on';
+      state.classList.remove('paused');
+      time.textContent = lastSyncedAt
+        ? `Last synced ${lastSyncedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`
+        : 'Waiting for first sync';
+    }
 
     function setupRevealObserver() {
       if (prefersReducedMotion || !('IntersectionObserver' in window)) {
@@ -1239,10 +1291,12 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       }
     }
 
-    async function selectIncident(id, showLoading = true) {
+    async function selectIncident(id, showLoading = true, preserveCurrentDetail = false) {
       activeIncidentId = id;
       renderIncidentList();
       if (showLoading) {
+        renderDetailLoading();
+      } else if (!preserveCurrentDetail && !isExplainingIncident) {
         renderDetailLoading();
       }
 
@@ -1395,6 +1449,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     async function explainIncident(id) {
       let incident;
+      isExplainingIncident = true;
       try {
         const incidentResponse = await fetch(`/api/incidents/${id}`);
         if (!incidentResponse.ok) {
@@ -1417,6 +1472,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         } else {
           renderErrorDetail(error);
         }
+      } finally {
+        isExplainingIncident = false;
       }
     }
 
