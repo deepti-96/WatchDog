@@ -75,8 +75,19 @@ async fn explain_incident(
         Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     };
 
+    if let Some(explanation) = incident.cached_explanation.clone() {
+        return Json(ExplainResponse { explanation }).into_response();
+    }
+
     match llm::explain_incident(&incident).await {
-        Ok(explanation) => Json(ExplainResponse { explanation }).into_response(),
+        Ok(explanation) => match storage::update_incident_explanation(&state.state_dir, &incident.id, &explanation) {
+            Ok(Some(updated)) => Json(ExplainResponse {
+                explanation: updated.cached_explanation.unwrap_or(explanation),
+            })
+            .into_response(),
+            Ok(None) => Json(ExplainResponse { explanation }).into_response(),
+            Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        },
         Err(error) => (StatusCode::BAD_GATEWAY, error.to_string()).into_response(),
     }
 }
@@ -1163,11 +1174,15 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const verdict = incident.verdict;
       const comparison = verdict.comparison;
       const signature = verdict.top_error_signature || 'No dominant error signature captured';
-      const explanationBody = explanation
-        ? escapeHtml(explanation)
+      const resolvedExplanation = explanation || incident.cached_explanation;
+      const explanationBody = resolvedExplanation
+        ? escapeHtml(resolvedExplanation)
         : explanationError
           ? `Explanation failed: ${escapeHtml(explanationError)}`
           : 'No explanation generated yet. Click "Explain Incident" to get an evidence-grounded summary and debugging steps.';
+      const explanationMeta = incident.cached_explanation_updated_at
+        ? `Cached ${new Date(incident.cached_explanation_updated_at).toLocaleString()}`
+        : 'Generated on demand';
 
       panel.innerHTML = `
         <section class="hero reveal in-view">
@@ -1244,7 +1259,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <article class="section-card reveal reveal-delay-3">
               <div class="section-heading">
                 <h3>AI Explanation</h3>
-                <span class="muted">Evidence-grounded summary</span>
+                <span class="muted">${escapeHtml(explanationMeta)}</span>
               </div>
               <pre>${explanationBody}</pre>
             </article>
