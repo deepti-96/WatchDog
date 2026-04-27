@@ -109,6 +109,8 @@ mod tests {
                 }],
             },
             alert_text: "watchdog detected a deployment regression".to_string(),
+            cached_explanation: None,
+            cached_explanation_updated_at: None,
         };
 
         let prompt = build_incident_prompt(&incident);
