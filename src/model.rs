@@ -72,6 +72,8 @@ pub struct Incident {
     pub summary: String,
     pub verdict: RegressionVerdict,
     pub alert_text: String,
+    pub cached_explanation: Option<String>,
+    pub cached_explanation_updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -82,6 +84,7 @@ pub struct IncidentListItem {
     pub summary: String,
     pub deploy_id: String,
     pub environment: String,
+    pub has_cached_explanation: bool,
 }
 
 impl Incident {
@@ -93,6 +96,7 @@ impl Incident {
             summary: self.summary.clone(),
             deploy_id: self.verdict.deploy_id.clone(),
             environment: self.verdict.environment.clone(),
+            has_cached_explanation: self.cached_explanation.is_some(),
         }
     }
 }
