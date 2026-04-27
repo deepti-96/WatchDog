@@ -403,7 +403,37 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .sidebar-stats {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .list-controls {
+      display: grid;
+      gap: 10px;
+    }
+
+    .control-input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink);
+      box-shadow: var(--shadow-sm);
+      transition: border-color 160ms ease, background 220ms ease, color 220ms ease;
+    }
+
+    .control-input::placeholder {
+      color: var(--muted);
+    }
+
+    .control-input:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+      border-color: var(--accent);
+    }
+
+    html[data-theme="dark"] .control-input {
+      background: rgba(255, 255, 255, 0.06);
     }
 
     .overview-grid {
@@ -949,6 +979,20 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <div class="label">High Severity</div>
           <strong id="high-count">0</strong>
         </article>
+        <article class="mini-card">
+          <div class="label">AI Cached</div>
+          <strong id="cached-count">0</strong>
+        </article>
+      </section>
+
+      <section class="list-controls reveal reveal-delay-3" aria-label="Incident filters">
+        <input id="incident-search" class="control-input" type="search" placeholder="Search deploys, summaries, environments" aria-label="Search incidents" />
+        <select id="severity-filter" class="control-input" aria-label="Filter incidents by severity">
+          <option value="all">All severities</option>
+          <option value="high">High severity</option>
+          <option value="medium">Medium severity</option>
+          <option value="cached">Has AI explanation</option>
+        </select>
       </section>
 
       <div id="incident-list" class="incident-list reveal reveal-delay-3" role="list" aria-label="Incident list"></div>
@@ -960,12 +1004,15 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
   <script>
     let incidents = [];
     let activeIncidentId = null;
+    let searchQuery = '';
+    let severityFilter = 'all';
     const THEME_KEY = 'watchdog-theme';
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     document.addEventListener('DOMContentLoaded', () => {
       applySavedTheme();
       bindThemeToggle();
+      bindFilters();
       renderEmptyDetail();
       setupRevealObserver();
       loadIncidents();
@@ -1055,9 +1102,32 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       });
     }
 
+    function bindFilters() {
+      document.getElementById('incident-search').addEventListener('input', (event) => {
+        searchQuery = event.target.value.trim().toLowerCase();
+        renderIncidentList();
+      });
+
+      document.getElementById('severity-filter').addEventListener('change', (event) => {
+        severityFilter = event.target.value;
+        renderIncidentList();
+      });
+    }
+
+    function visibleIncidents() {
+      return incidents.filter((incident) => {
+        const haystack = [incident.deploy_id, incident.summary, incident.environment].join(' ').toLowerCase();
+        const matchesSearch = !searchQuery || haystack.includes(searchQuery);
+        const matchesSeverity = severityFilter === 'all'
+          || (severityFilter === 'cached' ? incident.has_cached_explanation : incident.severity === severityFilter);
+        return matchesSearch && matchesSeverity;
+      });
+    }
+
     function renderSidebarStats() {
       document.getElementById('incident-count').textContent = incidents.length;
       document.getElementById('high-count').textContent = incidents.filter((incident) => incident.severity === 'high').length;
+      document.getElementById('cached-count').textContent = incidents.filter((incident) => incident.has_cached_explanation).length;
     }
 
     function renderIncidentListLoading() {
@@ -1073,12 +1143,13 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function renderIncidentList() {
       const container = document.getElementById('incident-list');
-      if (!incidents.length) {
-        container.innerHTML = '<div class="empty reveal in-view">No incidents captured yet. Start the daemon, trigger a deploy, and this list will populate automatically.</div>';
+      const visible = visibleIncidents();
+      if (!visible.length) {
+        container.innerHTML = '<div class="empty reveal in-view">No incidents match the current filters. Try clearing the search or changing the severity filter.</div>';
         return;
       }
 
-      container.innerHTML = incidents.map((incident, index) => renderIncidentCard(incident, index)).join('');
+      container.innerHTML = visible.map((incident, index) => renderIncidentCard(incident, index)).join('');
       activateReveals(container);
     }
 
@@ -1099,6 +1170,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <div class="badge-row">
               ${renderBadge(incident.severity, incident.severity)}
               ${renderBadge('environment', incident.environment)}
+              ${incident.has_cached_explanation ? renderBadge('subtle', 'AI cached') : ''}
             </div>
             ${renderBadge('subtle', new Date(incident.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}
           </div>
