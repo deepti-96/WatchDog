@@ -6,6 +6,7 @@ mod cli;
 mod dashboard;
 mod detector;
 mod engine;
+mod export;
 mod llm;
 mod logs;
 mod model;
