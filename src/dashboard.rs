@@ -1432,6 +1432,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <div class="hero-actions">
             <button class="button button-primary" ${loading ? 'disabled' : ''} onclick="explainIncident('${incident.id}')">${loading ? 'Explaining…' : 'Explain Incident'}</button>
             <button class="button button-secondary" onclick="loadIncidents()">Refresh Incidents</button>
+            <a class="refresh-link" href="/api/incidents/${incident.id}/export/markdown">Download Markdown</a>
+            <a class="refresh-link" href="/api/incidents/${incident.id}/export/json">Download JSON</a>
           </div>
         </section>
 
