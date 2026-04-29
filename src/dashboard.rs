@@ -723,6 +723,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .badge.medium { background: var(--accent-soft); color: var(--accent-strong); }
     .badge.environment { background: rgba(23, 32, 42, 0.07); color: var(--ink); border-color: rgba(23, 32, 42, 0.06); }
     .badge.subtle { background: rgba(15, 118, 110, 0.08); color: var(--accent-strong); }
+    .badge.open { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+    .badge.resolved { background: rgba(34, 197, 94, 0.16); color: #15803d; }
 
     html[data-theme="dark"] .badge.environment {
       background: rgba(255, 255, 255, 0.06);
@@ -893,6 +895,30 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       color: var(--warning);
       border: 1px solid rgba(234, 88, 12, 0.16);
       line-height: 1.55;
+    }
+
+    .notes-box {
+      width: 100%;
+      min-height: 120px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--ink);
+      resize: vertical;
+      box-shadow: var(--shadow-sm);
+    }
+
+    html[data-theme="dark"] .notes-box {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .notes-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
     }
 
     .timeline {
@@ -1365,8 +1391,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <div class="incident-card-head">
             <div class="badge-row">
               ${renderBadge(incident.severity, incident.severity)}
+              ${renderBadge(incident.status, incident.status)}
               ${renderBadge('environment', incident.environment)}
               ${incident.has_cached_explanation ? renderBadge('subtle', 'AI cached') : ''}
+              ${incident.has_notes ? renderBadge('subtle', 'Notes') : ''}
             </div>
             ${renderBadge('subtle', new Date(incident.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}
           </div>
@@ -1459,6 +1487,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <div class="hero-copy">
             <div class="badge-row">
               ${renderBadge(incident.severity, incident.severity)}
+              ${renderBadge(incident.status, incident.status)}
               ${renderBadge('environment', verdict.environment)}
               ${renderBadge('subtle', `deploy ${escapeHtml(verdict.deploy_id)}`)}
             </div>
@@ -1530,6 +1559,33 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
             <article class="section-card reveal reveal-delay-3">
               <div class="section-heading">
+                <h3>Incident Workflow</h3>
+                <span class="muted">Track the investigation state</span>
+              </div>
+              <div class="badge-row">
+                ${renderBadge(incident.status, incident.status)}
+                ${incident.notes.trim() ? renderBadge('subtle', 'Notes saved') : renderBadge('subtle', 'No notes yet')}
+              </div>
+              <div class="hero-actions" style="margin-top: 14px; justify-content: flex-start;">
+                <button class="button button-secondary" onclick="setIncidentStatus('${incident.id}', 'open')">Mark Open</button>
+                <button class="button button-secondary" onclick="setIncidentStatus('${incident.id}', 'resolved')">Mark Resolved</button>
+              </div>
+            </article>
+
+            <article class="section-card reveal reveal-delay-3">
+              <div class="section-heading">
+                <h3>Investigation Notes</h3>
+                <span class="muted">Persisted with the incident</span>
+              </div>
+              <textarea id="incident-notes" class="notes-box" placeholder="Capture what you found, what changed, and what to check next...">${escapeHtml(incident.notes)}</textarea>
+              <div class="notes-actions">
+                <span class="muted">Notes are saved back into the incident file</span>
+                <button class="button button-secondary" onclick="saveIncidentNotes('${incident.id}')">Save Notes</button>
+              </div>
+            </article>
+
+            <article class="section-card reveal reveal-delay-3">
+              <div class="section-heading">
                 <h3>AI Explanation</h3>
                 <span class="muted">${escapeHtml(explanationMeta)}</span>
               </div>
@@ -1542,6 +1598,39 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       activateReveals(panel);
     }
 
+
+    async function setIncidentStatus(id, status) {
+      const response = await fetch(`/api/incidents/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const incident = await response.json();
+      await loadIncidents({ silent: true });
+      renderDetail(incident, incident.cached_explanation, false, null);
+    }
+
+    async function saveIncidentNotes(id) {
+      const notes = document.getElementById('incident-notes')?.value || '';
+      const response = await fetch(`/api/incidents/${id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const incident = await response.json();
+      await loadIncidents({ silent: true });
+      renderDetail(incident, incident.cached_explanation, false, null);
+    }
 
     async function explainIncident(id) {
       let incident;
