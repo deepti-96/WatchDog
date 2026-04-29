@@ -6,7 +6,7 @@ use axum::http::{header, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,6 +22,16 @@ struct ExplainResponse {
     explanation: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct UpdateStatusRequest {
+    status: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateNotesRequest {
+    notes: String,
+}
+
 pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Result<()> {
     let app_state = AppState {
         state_dir: Arc::new(state_dir),
@@ -31,6 +41,8 @@ pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Resul
         .route("/", get(index))
         .route("/api/incidents", get(list_incidents))
         .route("/api/incidents/{id}", get(get_incident))
+        .route("/api/incidents/{id}/status", post(update_incident_status))
+        .route("/api/incidents/{id}/notes", post(update_incident_notes))
         .route("/api/incidents/{id}/explain", post(explain_incident))
         .route("/api/incidents/{id}/export/json", get(export_incident_json))
         .route("/api/incidents/{id}/export/markdown", get(export_incident_markdown))
@@ -120,6 +132,30 @@ async fn export_incident_markdown(
         response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
     }
     response
+}
+
+async fn update_incident_status(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateStatusRequest>,
+) -> impl IntoResponse {
+    match storage::update_incident_status(&state.state_dir, &id, &payload.status) {
+        Ok(Some(incident)) => Json(incident).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, "incident not found").into_response(),
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    }
+}
+
+async fn update_incident_notes(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateNotesRequest>,
+) -> impl IntoResponse {
+    match storage::update_incident_notes(&state.state_dir, &id, &payload.notes) {
+        Ok(Some(incident)) => Json(incident).into_response(),
+        Ok(None) => (StatusCode::NOT_FOUND, "incident not found").into_response(),
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    }
 }
 
 async fn explain_incident(
@@ -1505,6 +1541,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       activateReveals(panel);
     }
+
 
     async function explainIncident(id) {
       let incident;
