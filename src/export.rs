@@ -85,6 +85,8 @@ mod tests {
             alert_text: "watchdog detected a deployment regression".to_string(),
             cached_explanation: Some("Likely DB pool exhaustion".to_string()),
             cached_explanation_updated_at: Some(Utc::now()),
+            status: "open".to_string(),
+            notes: "Check DB pool metrics".to_string(),
         };
 
         let markdown = render_markdown(&incident);
