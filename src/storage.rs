@@ -14,6 +14,8 @@ pub fn persist_incident(state_dir: &Path, verdict: &RegressionVerdict, alert_tex
         alert_text: alert_text.to_string(),
         cached_explanation: None,
         cached_explanation_updated_at: None,
+        status: "open".to_string(),
+        notes: String::new(),
     };
 
     write_incident(state_dir, &incident)?;
@@ -59,6 +61,26 @@ pub fn update_incident_explanation(state_dir: &Path, incident_id: &str, explanat
 
     incident.cached_explanation = Some(explanation.to_string());
     incident.cached_explanation_updated_at = Some(Utc::now());
+    write_incident(state_dir, &incident)?;
+    Ok(Some(incident))
+}
+
+pub fn update_incident_status(state_dir: &Path, incident_id: &str, status: &str) -> Result<Option<Incident>> {
+    let Some(mut incident) = read_incident(state_dir, incident_id)? else {
+        return Ok(None);
+    };
+
+    incident.status = status.to_string();
+    write_incident(state_dir, &incident)?;
+    Ok(Some(incident))
+}
+
+pub fn update_incident_notes(state_dir: &Path, incident_id: &str, notes: &str) -> Result<Option<Incident>> {
+    let Some(mut incident) = read_incident(state_dir, incident_id)? else {
+        return Ok(None);
+    };
+
+    incident.notes = notes.to_string();
     write_incident(state_dir, &incident)?;
     Ok(Some(incident))
 }
