@@ -1,5 +1,7 @@
-use crate::model::{Incident, RegressionVerdict};
-use anyhow::{Context, Result};
+use crate::model::{
+    normalize_incident_status, Incident, RegressionVerdict, INCIDENT_STATUS_OPEN,
+};
+use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -14,7 +16,7 @@ pub fn persist_incident(state_dir: &Path, verdict: &RegressionVerdict, alert_tex
         alert_text: alert_text.to_string(),
         cached_explanation: None,
         cached_explanation_updated_at: None,
-        status: "open".to_string(),
+        status: INCIDENT_STATUS_OPEN.to_string(),
         notes: String::new(),
     };
 
@@ -70,7 +72,9 @@ pub fn update_incident_status(state_dir: &Path, incident_id: &str, status: &str)
         return Ok(None);
     };
 
-    incident.status = status.to_string();
+    let normalized = normalize_incident_status(status)
+        .ok_or_else(|| anyhow!("invalid incident status: {status}"))?;
+    incident.status = normalized.to_string();
     write_incident(state_dir, &incident)?;
     Ok(Some(incident))
 }
@@ -80,7 +84,7 @@ pub fn update_incident_notes(state_dir: &Path, incident_id: &str, notes: &str) -
         return Ok(None);
     };
 
-    incident.notes = notes.to_string();
+    incident.notes = notes.trim().to_string();
     write_incident(state_dir, &incident)?;
     Ok(Some(incident))
 }
