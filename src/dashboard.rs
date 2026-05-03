@@ -1,5 +1,6 @@
 use crate::export;
 use crate::llm;
+use crate::model::normalize_incident_status;
 use crate::storage;
 use axum::extract::{Path, State};
 use axum::http::{header, StatusCode};
@@ -139,7 +140,11 @@ async fn update_incident_status(
     Path(id): Path<String>,
     Json(payload): Json<UpdateStatusRequest>,
 ) -> impl IntoResponse {
-    match storage::update_incident_status(&state.state_dir, &id, &payload.status) {
+    let Some(status) = normalize_incident_status(&payload.status) else {
+        return (StatusCode::BAD_REQUEST, "invalid incident status").into_response();
+    };
+
+    match storage::update_incident_status(&state.state_dir, &id, status) {
         Ok(Some(incident)) => Json(incident).into_response(),
         Ok(None) => (StatusCode::NOT_FOUND, "incident not found").into_response(),
         Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
@@ -1567,8 +1572,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 ${incident.notes.trim() ? renderBadge('subtle', 'Notes saved') : renderBadge('subtle', 'No notes yet')}
               </div>
               <div class="hero-actions" style="margin-top: 14px; justify-content: flex-start;">
-                <button class="button button-secondary" onclick="setIncidentStatus('${incident.id}', 'open')">Mark Open</button>
-                <button class="button button-secondary" onclick="setIncidentStatus('${incident.id}', 'resolved')">Mark Resolved</button>
+                <button class="button button-secondary" ${incident.status === 'open' ? 'disabled' : ''} onclick="setIncidentStatus('${incident.id}', 'open')">Mark Open</button>
+                <button class="button button-secondary" ${incident.status === 'resolved' ? 'disabled' : ''} onclick="setIncidentStatus('${incident.id}', 'resolved')">Mark Resolved</button>
               </div>
             </article>
 
