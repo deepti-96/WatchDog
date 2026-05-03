@@ -23,12 +23,19 @@ pub fn render_markdown(incident: &Incident) -> String {
         .as_deref()
         .unwrap_or("No AI explanation has been generated for this incident yet.");
 
+    let notes = if incident.notes.trim().is_empty() {
+        "No investigation notes recorded yet.".to_string()
+    } else {
+        incident.notes.clone()
+    };
+
     format!(
-        "# Watchdog Incident Report\n\n## Summary\n- Incident ID: `{}`\n- Deploy: `{}`\n- Environment: `{}`\n- Severity: `{}`\n- Created At: `{}`\n- Detected At: `{}`\n- Seconds After Deploy: `{}`\n\n## Regression Signals\n- Error Rate Delta: `{:.3}`\n- Latency Delta: `{:.1} ms`\n- Requests at Detection: `{:.1} req/s`\n- Dominant Error Signature: `{}`\n- Dominant Error Count: `{}`\n\n## Detector Verdict\n{}\n\n## Timeline\n{}\n\n## AI Explanation\n_{}_\n\n{}\n",
+        "# Watchdog Incident Report\n\n## Summary\n- Incident ID: `{}`\n- Deploy: `{}`\n- Environment: `{}`\n- Severity: `{}`\n- Status: `{}`\n- Created At: `{}`\n- Detected At: `{}`\n- Seconds After Deploy: `{}`\n\n## Regression Signals\n- Error Rate Delta: `{:.3}`\n- Latency Delta: `{:.1} ms`\n- Requests at Detection: `{:.1} req/s`\n- Dominant Error Signature: `{}`\n- Dominant Error Count: `{}`\n\n## Detector Verdict\n{}\n\n## Timeline\n{}\n\n## Investigation Notes\n{}\n\n## AI Explanation\n_{}_\n\n{}\n",
         incident.id,
         verdict.deploy_id,
         verdict.environment,
         incident.severity,
+        incident.status,
         incident.created_at,
         verdict.detected_at,
         verdict.seconds_after_deploy,
@@ -39,6 +46,7 @@ pub fn render_markdown(incident: &Incident) -> String {
         verdict.top_error_count,
         incident.alert_text,
         timeline,
+        notes,
         cached_note,
         explanation
     )
@@ -94,5 +102,7 @@ mod tests {
         assert!(markdown.contains("v1.2.3"));
         assert!(markdown.contains("api: database timeout"));
         assert!(markdown.contains("Likely DB pool exhaustion"));
+        assert!(markdown.contains("Check DB pool metrics"));
+        assert!(markdown.contains("Status: `open`"));
     }
 }
