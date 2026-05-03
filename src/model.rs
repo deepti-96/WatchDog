@@ -1,6 +1,17 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub const INCIDENT_STATUS_OPEN: &str = "open";
+pub const INCIDENT_STATUS_RESOLVED: &str = "resolved";
+
+pub fn normalize_incident_status(status: &str) -> Option<&'static str> {
+    match status.trim().to_ascii_lowercase().as_str() {
+        INCIDENT_STATUS_OPEN => Some(INCIDENT_STATUS_OPEN),
+        INCIDENT_STATUS_RESOLVED => Some(INCIDENT_STATUS_RESOLVED),
+        _ => None,
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricSample {
     pub timestamp: DateTime<Utc>,
@@ -104,5 +115,17 @@ impl Incident {
             status: self.status.clone(),
             has_notes: !self.notes.trim().is_empty(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn incident_status_normalizes_expected_values() {
+        assert_eq!(normalize_incident_status("open"), Some(INCIDENT_STATUS_OPEN));
+        assert_eq!(normalize_incident_status(" RESOLVED "), Some(INCIDENT_STATUS_RESOLVED));
+        assert_eq!(normalize_incident_status("invalid"), None);
     }
 }
