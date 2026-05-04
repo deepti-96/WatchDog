@@ -1519,6 +1519,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           </div>
           <div class="hero-actions">
             <button class="button button-primary" ${loading ? 'disabled' : ''} onclick="explainIncident('${incident.id}')">${loading ? 'Explaining…' : 'Explain Incident'}</button>
+            <button class="button button-secondary" ${loading ? 'disabled' : ''} onclick="regenerateExplanation('${incident.id}')">${loading ? 'Refreshing…' : 'Regenerate Explanation'}</button>
             <button class="button button-secondary" onclick="loadIncidents()">Refresh Incidents</button>
             <a class="refresh-link" href="/api/incidents/${incident.id}/export/markdown">Download Markdown</a>
             <a class="refresh-link" href="/api/incidents/${incident.id}/export/json">Download JSON</a>
@@ -1653,6 +1654,37 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const incident = await response.json();
       await loadIncidents({ silent: true });
       renderDetail(incident, incident.cached_explanation, false, null);
+    }
+
+    async function regenerateExplanation(id) {
+      let incident;
+      isExplainingIncident = true;
+      try {
+        const incidentResponse = await fetch(`/api/incidents/${id}`);
+        if (!incidentResponse.ok) {
+          throw new Error(await incidentResponse.text());
+        }
+        incident = await incidentResponse.json();
+        renderDetail(incident, null, true, null);
+
+        const explainResponse = await fetch(`/api/incidents/${id}/explain/refresh`, { method: 'POST' });
+        const body = await explainResponse.text();
+        renderDetail(
+          incident,
+          explainResponse.ok ? JSON.parse(body).explanation : null,
+          false,
+          explainResponse.ok ? null : body,
+        );
+        await loadIncidents({ silent: true });
+      } catch (error) {
+        if (incident) {
+          renderDetail(incident, null, false, error.message || String(error));
+        } else {
+          renderErrorDetail(error);
+        }
+      } finally {
+        isExplainingIncident = false;
+      }
     }
 
     async function explainIncident(id) {
