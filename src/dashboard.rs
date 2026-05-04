@@ -45,6 +45,7 @@ pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Resul
         .route("/api/incidents/{id}/status", post(update_incident_status))
         .route("/api/incidents/{id}/notes", post(update_incident_notes))
         .route("/api/incidents/{id}/explain", post(explain_incident))
+        .route("/api/incidents/{id}/explain/refresh", post(refresh_incident_explanation))
         .route("/api/incidents/{id}/export/json", get(export_incident_json))
         .route("/api/incidents/{id}/export/markdown", get(export_incident_markdown))
         .with_state(app_state);
@@ -163,18 +164,35 @@ async fn update_incident_notes(
     }
 }
 
+async fn refresh_incident_explanation(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    generate_incident_explanation(state, id, true).await
+}
+
 async fn explain_incident(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    generate_incident_explanation(state, id, false).await
+}
+
+async fn generate_incident_explanation(
+    state: AppState,
+    id: String,
+    force_refresh: bool,
+) -> Response {
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
         Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     };
 
-    if let Some(explanation) = incident.cached_explanation.clone() {
-        return Json(ExplainResponse { explanation }).into_response();
+    if !force_refresh {
+        if let Some(explanation) = incident.cached_explanation.clone() {
+            return Json(ExplainResponse { explanation }).into_response();
+        }
     }
 
     match llm::explain_incident(&incident).await {
