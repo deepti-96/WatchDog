@@ -1057,6 +1057,72 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .float-accent.one { top: -60px; right: 8%; }
     .float-accent.two { bottom: 18%; left: -60px; animation-delay: -4s; }
 
+    .toast-stack {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 20;
+      display: grid;
+      gap: 12px;
+      width: min(360px, calc(100vw - 28px));
+      pointer-events: none;
+    }
+
+    .toast {
+      pointer-events: auto;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(19, 31, 39, 0.96), rgba(13, 22, 29, 0.92));
+      color: #f8fbfc;
+      box-shadow: var(--shadow-lg);
+      padding: 16px 18px;
+      display: grid;
+      gap: 8px;
+      transform: translateY(12px);
+      opacity: 0;
+      transition: transform 220ms ease, opacity 220ms ease;
+    }
+
+    .toast.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.warning {
+      background: linear-gradient(180deg, rgba(90, 43, 12, 0.96), rgba(64, 27, 8, 0.92));
+    }
+
+    .toast strong {
+      font-size: 0.98rem;
+      letter-spacing: -0.03em;
+    }
+
+    .toast p {
+      color: rgba(248, 251, 252, 0.82);
+      line-height: 1.55;
+    }
+
+    .toast-meta {
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: rgba(248, 251, 252, 0.72);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .toast-dismiss {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: rgba(248, 251, 252, 0.8);
+      cursor: pointer;
+      padding: 0;
+      font-size: 0.88rem;
+      justify-self: flex-start;
+    }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -1131,6 +1197,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 <body>
   <div class="float-accent one" aria-hidden="true"></div>
   <div class="float-accent two" aria-hidden="true"></div>
+  <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
   <div class="shell">
     <aside class="panel sidebar reveal" aria-label="Incident list">
       <div class="sidebar-top">
@@ -1272,7 +1339,6 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       toggle.setAttribute('aria-label', label);
       toggle.setAttribute('title', label);
     }
-
 
     function bindVisibilityRefresh() {
       document.addEventListener('visibilitychange', () => {
