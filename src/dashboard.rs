@@ -1435,6 +1435,19 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         : `New incident detected for ${newestIncident.deploy_id}.`;
 
       showToast(toastMessage, newestIncident.severity === 'high' ? 'warning' : 'info', newestIncident);
+
+      if ('Notification' in window && Notification.permission === 'granted' && browserNotificationsEnabled()) {
+        const body = `${newestIncident.summary}${extraCount > 0 ? ` (+${extraCount} more)` : ''}`;
+        const notification = new Notification(`watchdog: ${newestIncident.deploy_id}`, {
+          body,
+          tag: newestIncident.id,
+        });
+        notification.onclick = () => {
+          window.focus();
+          selectIncident(newestIncident.id, true);
+          notification.close();
+        };
+      }
     }
 
     function showToast(message, tone = 'info', incident = null) {
