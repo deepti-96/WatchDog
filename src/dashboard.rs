@@ -441,6 +441,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       box-shadow: var(--shadow-sm);
     }
 
+    .sync-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
     html[data-theme="dark"] .sync-bar {
       background: rgba(255, 255, 255, 0.05);
     }
@@ -832,6 +840,13 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       border-color: var(--line);
     }
 
+    .button-small {
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+    }
+
     .section-card {
       padding: 18px;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(251, 247, 239, 0.94));
@@ -1213,7 +1228,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       <section class="sync-bar reveal reveal-delay-1" aria-label="Dashboard sync status">
         <div id="sync-state" class="sync-state">Auto-refresh on</div>
-        <div id="sync-time">Waiting for first sync</div>
+        <div class="sync-actions">
+          <button id="notify-toggle" class="button button-secondary button-small" type="button">Browser alerts off</button>
+          <div id="sync-time">Waiting for first sync</div>
+        </div>
       </section>
 
       <section class="status-banner reveal reveal-delay-1" aria-label="Monitoring status">
@@ -1266,12 +1284,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let knownIncidentIds = new Set();
     let activeToastTimer = null;
     const THEME_KEY = 'watchdog-theme';
+    const NOTIFICATION_PREF_KEY = 'watchdog-browser-alerts';
     const REFRESH_INTERVAL_MS = 5000;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     document.addEventListener('DOMContentLoaded', () => {
       applySavedTheme();
       bindThemeToggle();
+      bindNotificationToggle();
       bindFilters();
       bindVisibilityRefresh();
       renderEmptyDetail();
@@ -1346,6 +1366,60 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
       toggle.setAttribute('aria-label', label);
       toggle.setAttribute('title', label);
+    }
+
+    function bindNotificationToggle() {
+      const toggle = document.getElementById('notify-toggle');
+      updateNotificationToggle(toggle);
+      toggle.addEventListener('click', async () => {
+        if (!('Notification' in window)) {
+          showToast('Browser notifications are not supported in this browser.', 'warning');
+          return;
+        }
+
+        if (Notification.permission === 'granted') {
+          const nextEnabled = !browserNotificationsEnabled();
+          localStorage.setItem(NOTIFICATION_PREF_KEY, nextEnabled ? 'on' : 'off');
+          updateNotificationToggle(toggle);
+          showToast(nextEnabled ? 'Browser notifications enabled for new incidents.' : 'Browser notifications turned off. In-app alerts stay on.');
+          return;
+        }
+
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          localStorage.setItem(NOTIFICATION_PREF_KEY, 'on');
+          updateNotificationToggle(toggle);
+          showToast('Browser notifications enabled for new incidents.');
+        } else {
+          localStorage.setItem(NOTIFICATION_PREF_KEY, 'off');
+          updateNotificationToggle(toggle);
+          showToast('Browser notifications were not enabled. In-app alerts stay on.', 'warning');
+        }
+      });
+    }
+
+    function browserNotificationsEnabled() {
+      return localStorage.getItem(NOTIFICATION_PREF_KEY) === 'on';
+    }
+
+    function updateNotificationToggle(toggle = document.getElementById('notify-toggle')) {
+      if (!toggle) {
+        return;
+      }
+
+      if (!('Notification' in window)) {
+        toggle.textContent = 'Alerts unsupported';
+        toggle.disabled = true;
+        return;
+      }
+
+      if (Notification.permission === 'granted' && browserNotificationsEnabled()) {
+        toggle.textContent = 'Browser alerts on';
+      } else if (Notification.permission === 'denied') {
+        toggle.textContent = 'Alerts blocked';
+      } else {
+        toggle.textContent = 'Browser alerts off';
+      }
     }
 
     function notifyOnNewIncidents(previousIncidentIds, nextIncidents) {
