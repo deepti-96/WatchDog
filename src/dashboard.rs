@@ -1263,6 +1263,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let lastSyncedAt = null;
     let refreshTimer = null;
     let isExplainingIncident = false;
+    let knownIncidentIds = new Set();
+    let activeToastTimer = null;
     const THEME_KEY = 'watchdog-theme';
     const REFRESH_INTERVAL_MS = 5000;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1284,15 +1286,21 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         renderIncidentListLoading();
       }
       try {
+        const previousIncidentIds = new Set(knownIncidentIds);
         const response = await fetch('/api/incidents');
         if (!response.ok) {
           throw new Error(await response.text());
         }
         incidents = await response.json();
+        knownIncidentIds = new Set(incidents.map((incident) => incident.id));
         lastSyncedAt = new Date();
         renderSidebarStats();
         renderIncidentList();
         renderSyncStatus();
+
+        if (previousIncidentIds.size > 0) {
+          notifyOnNewIncidents(previousIncidentIds, incidents);
+        }
 
         if (incidents.length) {
           const nextId = activeIncidentId && incidents.some((incident) => incident.id === activeIncidentId)
@@ -1338,6 +1346,64 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
       toggle.setAttribute('aria-label', label);
       toggle.setAttribute('title', label);
+    }
+
+    function notifyOnNewIncidents(previousIncidentIds, nextIncidents) {
+      const newIncidents = nextIncidents.filter((incident) => !previousIncidentIds.has(incident.id));
+      if (!newIncidents.length) {
+        return;
+      }
+
+      const newestIncident = newIncidents[0];
+      const extraCount = newIncidents.length - 1;
+      const toastMessage = extraCount > 0
+        ? `${newIncidents.length} new incidents detected. Most recent: ${newestIncident.deploy_id}.`
+        : `New incident detected for ${newestIncident.deploy_id}.`;
+
+      showToast(toastMessage, newestIncident.severity === 'high' ? 'warning' : 'info', newestIncident);
+    }
+
+    function showToast(message, tone = 'info', incident = null) {
+      const stack = document.getElementById('toast-stack');
+      if (!stack) {
+        return;
+      }
+
+      if (activeToastTimer) {
+        clearTimeout(activeToastTimer);
+      }
+
+      const meta = incident
+        ? `<div class="toast-meta"><span>${escapeHtml(incident.severity)} severity</span><span>${escapeHtml(incident.environment)}</span><span>${escapeHtml(incident.deploy_id)}</span></div>`
+        : '';
+
+      stack.innerHTML = `
+        <div class="toast ${tone}" role="status">
+          <strong>${incident ? 'New deploy regression captured' : 'Dashboard update'}</strong>
+          <p>${escapeHtml(message)}</p>
+          ${meta}
+          <button class="toast-dismiss" type="button" onclick="dismissToast()">Dismiss</button>
+        </div>
+      `;
+
+      const toast = stack.firstElementChild;
+      requestAnimationFrame(() => toast?.classList.add('visible'));
+      activeToastTimer = setTimeout(() => dismissToast(), 5200);
+    }
+
+    function dismissToast() {
+      const stack = document.getElementById('toast-stack');
+      const toast = stack?.firstElementChild;
+      if (!toast) {
+        return;
+      }
+
+      toast.classList.remove('visible');
+      window.setTimeout(() => {
+        if (stack) {
+          stack.innerHTML = '';
+        }
+      }, prefersReducedMotion ? 0 : 220);
     }
 
     function bindVisibilityRefresh() {
