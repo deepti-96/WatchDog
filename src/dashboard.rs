@@ -1286,8 +1286,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let refreshDelayMs = 5000;
     const THEME_KEY = 'watchdog-theme';
     const NOTIFICATION_PREF_KEY = 'watchdog-browser-alerts';
+    const NOTIFIED_INCIDENTS_KEY = 'watchdog-notified-incidents';
     const BASE_REFRESH_INTERVAL_MS = 5000;
     const MAX_REFRESH_INTERVAL_MS = 30000;
+    const MAX_STORED_NOTIFICATIONS = 80;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1438,10 +1440,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     function notifyOnNewIncidents(previousIncidentIds, nextIncidents) {
-      const newIncidents = nextIncidents.filter((incident) => !previousIncidentIds.has(incident.id));
+      const notifiedIncidentIds = readNotifiedIncidentIds();
+      const newIncidents = nextIncidents.filter((incident) => !previousIncidentIds.has(incident.id) && !notifiedIncidentIds.has(incident.id));
       if (!newIncidents.length) {
         return;
       }
+
+      newIncidents.forEach((incident) => notifiedIncidentIds.add(incident.id));
+      persistNotifiedIncidentIds(notifiedIncidentIds);
 
       const newestIncident = newIncidents[0];
       const extraCount = newIncidents.length - 1;
@@ -1463,6 +1469,21 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           notification.close();
         };
       }
+    }
+
+    function readNotifiedIncidentIds() {
+      try {
+        const raw = localStorage.getItem(NOTIFIED_INCIDENTS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(parsed) ? parsed : []);
+      } catch (_error) {
+        return new Set();
+      }
+    }
+
+    function persistNotifiedIncidentIds(notifiedIncidentIds) {
+      const trimmed = Array.from(notifiedIncidentIds).slice(-MAX_STORED_NOTIFICATIONS);
+      localStorage.setItem(NOTIFIED_INCIDENTS_KEY, JSON.stringify(trimmed));
     }
 
     function showToast(message, tone = 'info', incident = null) {
