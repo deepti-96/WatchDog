@@ -1281,6 +1281,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let lastSyncedAt = null;
     let refreshTimer = null;
     let isExplainingIncident = false;
+    let detailRequestVersion = 0;
     let knownIncidentIds = new Set();
     let loadIncidentsInFlight = null;
     let refreshDelayMs = 5000;
@@ -1693,9 +1694,19 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       }
     }
 
-    async function selectIncident(id, showLoading = true, preserveCurrentDetail = false) {
+    function beginDetailRequest(id) {
       activeIncidentId = id;
+      detailRequestVersion += 1;
       renderIncidentList();
+      return detailRequestVersion;
+    }
+
+    function isLatestDetailRequest(id, requestVersion) {
+      return activeIncidentId === id && detailRequestVersion === requestVersion;
+    }
+
+    async function selectIncident(id, showLoading = true, preserveCurrentDetail = false) {
+      const requestVersion = beginDetailRequest(id);
       if (showLoading) {
         renderDetailLoading();
       } else if (!preserveCurrentDetail && !isExplainingIncident) {
@@ -1708,8 +1719,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           throw new Error(await response.text());
         }
         const incident = await response.json();
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         renderDetail(incident, null, false, null);
       } catch (error) {
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         renderErrorDetail(error);
       }
     }
