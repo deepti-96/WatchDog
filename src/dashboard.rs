@@ -1899,6 +1899,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
 
     async function setIncidentStatus(id, status) {
+      const requestVersion = detailRequestVersion;
       const response = await fetch(`/api/incidents/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1911,10 +1912,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       const incident = await response.json();
       await loadIncidents({ silent: true });
+      if (!isLatestDetailRequest(id, requestVersion)) {
+        return;
+      }
       renderDetail(incident, incident.cached_explanation, false, null);
     }
 
     async function saveIncidentNotes(id) {
+      const requestVersion = detailRequestVersion;
       const notes = document.getElementById('incident-notes')?.value || '';
       const response = await fetch(`/api/incidents/${id}/notes`, {
         method: 'POST',
@@ -1928,11 +1933,15 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       const incident = await response.json();
       await loadIncidents({ silent: true });
+      if (!isLatestDetailRequest(id, requestVersion)) {
+        return;
+      }
       renderDetail(incident, incident.cached_explanation, false, null);
     }
 
     async function regenerateExplanation(id) {
       let incident;
+      const requestVersion = detailRequestVersion;
       isExplainingIncident = true;
       try {
         const incidentResponse = await fetch(`/api/incidents/${id}`);
@@ -1940,10 +1949,16 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           throw new Error(await incidentResponse.text());
         }
         incident = await incidentResponse.json();
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         renderDetail(incident, null, true, null);
 
         const explainResponse = await fetch(`/api/incidents/${id}/explain/refresh`, { method: 'POST' });
         const body = await explainResponse.text();
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         renderDetail(
           incident,
           explainResponse.ok ? JSON.parse(body).explanation : null,
@@ -1952,6 +1967,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         );
         await loadIncidents({ silent: true });
       } catch (error) {
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         if (incident) {
           renderDetail(incident, null, false, error.message || String(error));
         } else {
@@ -1964,6 +1982,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     async function explainIncident(id) {
       let incident;
+      const requestVersion = detailRequestVersion;
       isExplainingIncident = true;
       try {
         const incidentResponse = await fetch(`/api/incidents/${id}`);
@@ -1971,10 +1990,16 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           throw new Error(await incidentResponse.text());
         }
         incident = await incidentResponse.json();
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         renderDetail(incident, null, true, null);
 
         const explainResponse = await fetch(`/api/incidents/${id}/explain`, { method: 'POST' });
         const body = await explainResponse.text();
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         renderDetail(
           incident,
           explainResponse.ok ? JSON.parse(body).explanation : null,
@@ -1982,6 +2007,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           explainResponse.ok ? null : body,
         );
       } catch (error) {
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
         if (incident) {
           renderDetail(incident, null, false, error.message || String(error));
         } else {
