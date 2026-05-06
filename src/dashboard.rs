@@ -1284,6 +1284,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let knownIncidentIds = new Set();
     let loadIncidentsInFlight = null;
     let refreshDelayMs = 5000;
+    let toastSequence = 0;
     const THEME_KEY = 'watchdog-theme';
     const NOTIFICATION_PREF_KEY = 'watchdog-browser-alerts';
     const NOTIFIED_INCIDENTS_KEY = 'watchdog-notified-incidents';
@@ -1495,19 +1496,20 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const meta = incident
         ? `<div class="toast-meta"><span>${escapeHtml(incident.severity)} severity</span><span>${escapeHtml(incident.environment)}</span><span>${escapeHtml(incident.deploy_id)}</span></div>`
         : '';
+      const toastId = `toast-${Date.now()}-${++toastSequence}`;
 
-      stack.innerHTML = `
-        <div class="toast ${tone}" role="status">
+      stack.insertAdjacentHTML('beforeend', `
+        <div class="toast ${tone}" data-toast-id="${toastId}" role="status">
           <strong>${incident ? 'New deploy regression captured' : 'Dashboard update'}</strong>
           <p>${escapeHtml(message)}</p>
           ${meta}
-          <button class="toast-dismiss" type="button" onclick="dismissToast()">Dismiss</button>
+          <button class="toast-dismiss" type="button" onclick="dismissToast('${toastId}')">Dismiss</button>
         </div>
-      `;
+      `);
 
-      const toast = stack.firstElementChild;
+      const toast = stack.querySelector(`[data-toast-id="${toastId}"]`);
       requestAnimationFrame(() => toast?.classList.add('visible'));
-      window.setTimeout(() => dismissToast(), 5200);
+      window.setTimeout(() => dismissToast(toastId), 5200);
     }
 
     function dismissToast(toastId) {
@@ -1521,9 +1523,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       toast.classList.remove('visible');
       window.setTimeout(() => {
-        if (stack) {
-          stack.innerHTML = '';
-        }
+        toast.remove();
       }, prefersReducedMotion ? 0 : 220);
     }
 
@@ -1560,16 +1560,16 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       }
 
       if (errorMessage) {
-        state.textContent = 'Auto-refresh paused';
+        state.textContent = 'Auto-refresh retrying';
         state.classList.add('paused');
-        time.textContent = errorMessage;
+        time.textContent = `${errorMessage} · retry in ${Math.round(refreshDelayMs / 1000)}s`;
         return;
       }
 
       state.textContent = 'Auto-refresh on';
       state.classList.remove('paused');
       time.textContent = lastSyncedAt
-        ? `Last synced ${lastSyncedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}`
+        ? `Last synced ${lastSyncedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })} · next sync in ${Math.round(refreshDelayMs / 1000)}s`
         : 'Waiting for first sync';
     }
 
