@@ -1282,10 +1282,12 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let refreshTimer = null;
     let isExplainingIncident = false;
     let knownIncidentIds = new Set();
-    let activeToastTimer = null;
+    let loadIncidentsInFlight = null;
+    let refreshDelayMs = 5000;
     const THEME_KEY = 'watchdog-theme';
     const NOTIFICATION_PREF_KEY = 'watchdog-browser-alerts';
-    const REFRESH_INTERVAL_MS = 5000;
+    const BASE_REFRESH_INTERVAL_MS = 5000;
+    const MAX_REFRESH_INTERVAL_MS = 30000;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1301,45 +1303,58 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     });
 
     async function loadIncidents(options = {}) {
+      if (loadIncidentsInFlight) {
+        return loadIncidentsInFlight;
+      }
+
       const { silent = false } = options;
       if (!silent) {
         renderIncidentListLoading();
       }
-      try {
-        const previousIncidentIds = new Set(knownIncidentIds);
-        const response = await fetch('/api/incidents');
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
-        incidents = await response.json();
-        knownIncidentIds = new Set(incidents.map((incident) => incident.id));
-        lastSyncedAt = new Date();
-        renderSidebarStats();
-        renderIncidentList();
-        renderSyncStatus();
 
-        if (previousIncidentIds.size > 0) {
-          notifyOnNewIncidents(previousIncidentIds, incidents);
-        }
-
-        if (incidents.length) {
-          const nextId = activeIncidentId && incidents.some((incident) => incident.id === activeIncidentId)
-            ? activeIncidentId
-            : incidents[0].id;
-          if (!isExplainingIncident) {
-            await selectIncident(nextId, false, silent);
+      loadIncidentsInFlight = (async () => {
+        try {
+          const previousIncidentIds = new Set(knownIncidentIds);
+          const response = await fetch('/api/incidents');
+          if (!response.ok) {
+            throw new Error(await response.text());
           }
-        } else if (!silent) {
-          renderEmptyDetail();
-        }
-      } catch (error) {
-        renderSyncStatus(error.message || String(error));
-        if (!silent) {
+          incidents = await response.json();
+          knownIncidentIds = new Set(incidents.map((incident) => incident.id));
+          lastSyncedAt = new Date();
+          refreshDelayMs = BASE_REFRESH_INTERVAL_MS;
           renderSidebarStats();
-          renderIncidentListError(error);
-          renderErrorDetail(error);
+          renderIncidentList();
+          renderSyncStatus();
+
+          if (previousIncidentIds.size > 0) {
+            notifyOnNewIncidents(previousIncidentIds, incidents);
+          }
+
+          if (incidents.length) {
+            const nextId = activeIncidentId && incidents.some((incident) => incident.id === activeIncidentId)
+              ? activeIncidentId
+              : incidents[0].id;
+            if (!isExplainingIncident) {
+              await selectIncident(nextId, false, silent);
+            }
+          } else if (!silent) {
+            renderEmptyDetail();
+          }
+        } catch (error) {
+          refreshDelayMs = Math.min(Math.max(refreshDelayMs * 2, BASE_REFRESH_INTERVAL_MS), MAX_REFRESH_INTERVAL_MS);
+          renderSyncStatus(error.message || String(error));
+          if (!silent) {
+            renderSidebarStats();
+            renderIncidentListError(error);
+            renderErrorDetail(error);
+          }
+        } finally {
+          loadIncidentsInFlight = null;
         }
-      }
+      })();
+
+      return loadIncidentsInFlight;
     }
 
     function applySavedTheme() {
@@ -1456,10 +1471,6 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         return;
       }
 
-      if (activeToastTimer) {
-        clearTimeout(activeToastTimer);
-      }
-
       const meta = incident
         ? `<div class="toast-meta"><span>${escapeHtml(incident.severity)} severity</span><span>${escapeHtml(incident.environment)}</span><span>${escapeHtml(incident.deploy_id)}</span></div>`
         : '';
@@ -1475,12 +1486,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       const toast = stack.firstElementChild;
       requestAnimationFrame(() => toast?.classList.add('visible'));
-      activeToastTimer = setTimeout(() => dismissToast(), 5200);
+      window.setTimeout(() => dismissToast(), 5200);
     }
 
-    function dismissToast() {
+    function dismissToast(toastId) {
       const stack = document.getElementById('toast-stack');
-      const toast = stack?.firstElementChild;
+      const toast = toastId
+        ? stack?.querySelector(`[data-toast-id="${toastId}"]`)
+        : stack?.firstElementChild;
       if (!toast) {
         return;
       }
@@ -1502,15 +1515,20 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     function startAutoRefresh() {
+      scheduleNextRefresh();
+    }
+
+    function scheduleNextRefresh() {
       if (refreshTimer) {
-        clearInterval(refreshTimer);
+        clearTimeout(refreshTimer);
       }
 
-      refreshTimer = setInterval(() => {
+      refreshTimer = window.setTimeout(async () => {
         if (!document.hidden) {
-          loadIncidents({ silent: true });
+          await loadIncidents({ silent: true });
         }
-      }, REFRESH_INTERVAL_MS);
+        scheduleNextRefresh();
+      }, refreshDelayMs);
     }
 
     function renderSyncStatus(errorMessage = null) {
