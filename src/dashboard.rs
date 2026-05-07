@@ -1873,8 +1873,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <span class="muted">Baseline against detected state</span>
               </div>
               <div class="compare-grid">
-                ${renderCompareCard('Error Rate', comparison.baseline_error_rate.toFixed(3), comparison.detected_error_rate.toFixed(3))}
-                ${renderCompareCard('P95 Latency', `${comparison.baseline_latency_ms.toFixed(1)} ms`, `${comparison.detected_latency_ms.toFixed(1)} ms`)}
+                ${renderCompareCard('Error Rate', comparison.baseline_error_rate, comparison.detected_error_rate, { decimals: 3, tone: 'accent' })}
+                ${renderCompareCard('P95 Latency', comparison.baseline_latency_ms, comparison.detected_latency_ms, { decimals: 1, suffix: ' ms', tone: 'warning' })}
               </div>
             </article>
 
@@ -2094,10 +2094,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       `;
     }
 
-    function renderCompareCard(title, baseline, detected) {
+    function renderCompareCard(title, baselineValue, detectedValue, options = {}) {
+      const { decimals = 2, suffix = '', tone = 'accent' } = options;
+      const baseline = formatMetricValue(baselineValue, decimals, suffix);
+      const detected = formatMetricValue(detectedValue, decimals, suffix);
       return `
-        <div class="compare-card reveal reveal-delay-1">
+        <div class="compare-card ${tone === 'warning' ? 'warning' : ''} reveal reveal-delay-1">
           <h4>${escapeHtml(title)}</h4>
+          ${renderCompareChart(title, baselineValue, detectedValue, tone)}
           <div class="compare-row">
             <span class="row-label muted">Baseline</span>
             <strong>${escapeHtml(baseline)}</strong>
@@ -2108,6 +2112,60 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           </div>
         </div>
       `;
+    }
+
+    function renderCompareChart(title, baselineValue, detectedValue, tone = 'accent') {
+      const points = buildTrendPoints(Number(baselineValue), Number(detectedValue));
+      const width = 320;
+      const height = 82;
+      const left = 10;
+      const right = width - 10;
+      const top = 10;
+      const bottom = height - 16;
+      const minValue = Math.min(...points);
+      const maxValue = Math.max(...points);
+      const span = Math.max(maxValue - minValue, Math.max(Math.abs(maxValue) * 0.08, 0.001));
+      const normalizedMin = minValue - span * 0.16;
+      const normalizedMax = maxValue + span * 0.16;
+      const xFor = (index) => left + ((right - left) * index / (points.length - 1));
+      const yFor = (value) => {
+        const ratio = (value - normalizedMin) / (normalizedMax - normalizedMin || 1);
+        return bottom - ratio * (bottom - top);
+      };
+      const linePoints = points.map((value, index) => `${xFor(index).toFixed(1)},${yFor(value).toFixed(1)}`);
+      const areaPoints = [`${left},${bottom}`, ...linePoints, `${right},${bottom}`].join(' ');
+      const startX = xFor(0).toFixed(1);
+      const startY = yFor(points[0]).toFixed(1);
+      const endX = xFor(points.length - 1).toFixed(1);
+      const endY = yFor(points[points.length - 1]).toFixed(1);
+      return `
+        <svg class="compare-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)} trend from baseline to detected value">
+          <line class="compare-chart-grid" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}"></line>
+          <line class="compare-chart-grid" x1="${left}" y1="${top}" x2="${right}" y2="${top}"></line>
+          <polygon class="compare-chart-area" points="${areaPoints}"></polygon>
+          <polyline class="compare-chart-line" points="${linePoints.join(' ')}"></polyline>
+          <circle class="compare-chart-dot" cx="${startX}" cy="${startY}" r="4.5"></circle>
+          <circle class="compare-chart-dot" cx="${endX}" cy="${endY}" r="4.5"></circle>
+          <text class="compare-chart-label" x="${left}" y="${height - 2}">baseline</text>
+          <text class="compare-chart-label" x="${right}" y="${height - 2}" text-anchor="end">detected</text>
+        </svg>
+      `;
+    }
+
+    function buildTrendPoints(baselineValue, detectedValue) {
+      const start = Number.isFinite(baselineValue) ? baselineValue : 0;
+      const end = Number.isFinite(detectedValue) ? detectedValue : start;
+      const delta = end - start;
+      const shape = [0, 0.03, 0.08, 0.16, 0.34, 0.56, 0.8, 1];
+      return shape.map((ratio, index) => {
+        const easing = ratio * ratio * (3 - 2 * ratio);
+        const sway = delta === 0 ? 0 : Math.sin(index * 1.2) * delta * 0.04;
+        return start + delta * easing + sway;
+      });
+    }
+
+    function formatMetricValue(value, decimals = 2, suffix = '') {
+      return `${Number(value).toFixed(decimals)}${suffix}`;
     }
 
     function renderTimelineItem(event) {
