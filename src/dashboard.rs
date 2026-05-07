@@ -890,6 +890,57 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       margin-bottom: 14px;
     }
 
+    .compare-chart {
+      width: 100%;
+      height: 82px;
+      display: block;
+      margin: 0 0 14px;
+      overflow: visible;
+    }
+
+    .compare-chart-grid {
+      stroke: rgba(180, 158, 129, 0.18);
+      stroke-width: 1;
+      stroke-dasharray: 3 5;
+    }
+
+    .compare-chart-area {
+      fill: rgba(15, 118, 110, 0.12);
+    }
+
+    .compare-chart-line {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .compare-card.warning .compare-chart-area {
+      fill: rgba(234, 88, 12, 0.12);
+    }
+
+    .compare-card.warning .compare-chart-line {
+      stroke: #ea580c;
+    }
+
+    .compare-chart-dot {
+      fill: var(--surface-strong);
+      stroke: var(--accent);
+      stroke-width: 2.5;
+    }
+
+    .compare-card.warning .compare-chart-dot {
+      stroke: #ea580c;
+    }
+
+    .compare-chart-label {
+      fill: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
     .compare-row {
       display: flex;
       justify-content: space-between;
