@@ -1566,6 +1566,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       localStorage.setItem(NOTIFIED_INCIDENTS_KEY, JSON.stringify(trimmed));
     }
 
+    function clearNotifiedIncidentIds() {
+      localStorage.removeItem(NOTIFIED_INCIDENTS_KEY);
+    }
+
     function showToast(message, tone = 'info', incident = null) {
       const stack = document.getElementById('toast-stack');
       if (!stack) {
