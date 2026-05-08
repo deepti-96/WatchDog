@@ -1693,13 +1693,42 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     function visibleIncidents() {
-      return incidents.filter((incident) => {
-        const haystack = [incident.deploy_id, incident.summary, incident.environment].join(' ').toLowerCase();
-        const matchesSearch = !searchQuery || haystack.includes(searchQuery);
-        const matchesSeverity = severityFilter === 'all'
-          || (severityFilter === 'cached' ? incident.has_cached_explanation : incident.severity === severityFilter);
-        return matchesSearch && matchesSeverity;
-      });
+      return incidents
+        .filter((incident) => {
+          const haystack = [incident.deploy_id, incident.summary, incident.environment].join(' ').toLowerCase();
+          const matchesSearch = !searchQuery || haystack.includes(searchQuery);
+          const matchesSeverity = severityFilter === 'all'
+            || (severityFilter === 'cached' ? incident.has_cached_explanation : incident.severity === severityFilter);
+          const matchesWorkflow = workflowFilter === 'all' || incident.status === workflowFilter;
+          return matchesSearch && matchesSeverity && matchesWorkflow;
+        })
+        .sort(compareIncidents);
+    }
+
+    function compareIncidents(left, right) {
+      const createdDelta = new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+      const severityDelta = severityRank(right.severity) - severityRank(left.severity);
+      const workflowDelta = workflowRank(left.status) - workflowRank(right.status);
+
+      switch (sortMode) {
+        case 'oldest':
+          return -createdDelta;
+        case 'severity':
+          return severityDelta || createdDelta;
+        case 'open-first':
+          return workflowDelta || createdDelta;
+        case 'newest':
+        default:
+          return createdDelta || severityDelta;
+      }
+    }
+
+    function severityRank(severity) {
+      return severity === 'high' ? 2 : 1;
+    }
+
+    function workflowRank(status) {
+      return status === 'open' ? 0 : 1;
     }
 
     function renderSidebarStats() {
@@ -1723,7 +1752,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const container = document.getElementById('incident-list');
       const visible = visibleIncidents();
       if (!visible.length) {
-        container.innerHTML = '<div class="empty reveal in-view">No incidents match the current filters. Try clearing the search or changing the severity filter.</div>';
+        container.innerHTML = '<div class="empty reveal in-view">No incidents match the current triage controls. Try clearing the search or relaxing the severity, workflow, or sort filters.</div>';
         return;
       }
 
