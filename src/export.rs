@@ -1,5 +1,25 @@
 use crate::model::Incident;
 
+pub fn render_summary(incident: &Incident) -> String {
+    let verdict = &incident.verdict;
+    let top_error = verdict
+        .top_error_signature
+        .as_deref()
+        .unwrap_or("No dominant error signature captured");
+
+    format!(
+        "Watchdog incident for deploy {} in {}: {}. Detected {}s after deploy with error rate delta {:.3} and latency delta {:.1} ms. Top error: {}. Status: {}.",
+        verdict.deploy_id,
+        verdict.environment,
+        incident.summary,
+        verdict.seconds_after_deploy,
+        verdict.error_rate_delta,
+        verdict.latency_delta_ms,
+        top_error,
+        incident.status,
+    )
+}
+
 pub fn render_markdown(incident: &Incident) -> String {
     let verdict = &incident.verdict;
     let top_error = verdict
@@ -96,6 +116,10 @@ mod tests {
             status: "open".to_string(),
             notes: "Check DB pool metrics".to_string(),
         };
+
+        let summary = render_summary(&incident);
+        assert!(summary.contains("Watchdog incident for deploy v1.2.3 in demo"));
+        assert!(summary.contains("Top error: api: database timeout"));
 
         let markdown = render_markdown(&incident);
         assert!(markdown.contains("Watchdog Incident Report"));

@@ -48,6 +48,7 @@ pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Resul
         .route("/api/incidents/{id}/explain/refresh", post(refresh_incident_explanation))
         .route("/api/incidents/{id}/export/json", get(export_incident_json))
         .route("/api/incidents/{id}/export/markdown", get(export_incident_markdown))
+        .route("/api/incidents/{id}/summary", get(get_incident_summary))
         .with_state(app_state);
 
     let address: SocketAddr = format!("{}:{}", host, port).parse()?;
@@ -134,6 +135,19 @@ async fn export_incident_markdown(
         response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
     }
     response
+}
+
+async fn get_incident_summary(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Response {
+    let incident = match storage::read_incident(&state.state_dir, &id) {
+        Ok(Some(incident)) => incident,
+        Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
+        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    };
+
+    export::render_summary(&incident).into_response()
 }
 
 async fn update_incident_status(
