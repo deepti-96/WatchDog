@@ -1913,6 +1913,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <button class="button button-primary" ${loading ? 'disabled' : ''} onclick="explainIncident('${incident.id}')">${loading ? 'Explaining…' : 'Explain Incident'}</button>
             <button class="button button-secondary" ${loading ? 'disabled' : ''} onclick="regenerateExplanation('${incident.id}')">${loading ? 'Refreshing…' : 'Regenerate Explanation'}</button>
             <button class="button button-secondary" onclick="loadIncidents()">Refresh Incidents</button>
+            <button class="button button-secondary" onclick="copyIncidentSummary('${incident.id}')">Copy Summary</button>
             <a class="refresh-link" href="/api/incidents/${incident.id}/export/markdown">Download Markdown</a>
             <a class="refresh-link" href="/api/incidents/${incident.id}/export/json">Download JSON</a>
           </div>
@@ -2014,6 +2015,26 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       activateReveals(panel);
     }
 
+
+    async function copyIncidentSummary(id) {
+      try {
+        const response = await fetch(`/api/incidents/${id}/summary`);
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+
+        const summary = await response.text();
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(summary);
+          showToast('Incident summary copied to clipboard.');
+          return;
+        }
+
+        showToast(summary);
+      } catch (error) {
+        showToast(`Could not copy incident summary. ${error.message || String(error)}`, 'warning');
+      }
+    }
 
     async function setIncidentStatus(id, status) {
       const requestVersion = detailRequestVersion;
