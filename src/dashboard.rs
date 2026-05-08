@@ -1316,6 +1316,17 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <option value="medium">Medium severity</option>
           <option value="cached">Has AI explanation</option>
         </select>
+        <select id="workflow-filter" class="control-input" aria-label="Filter incidents by workflow state">
+          <option value="all">All workflow states</option>
+          <option value="open">Open only</option>
+          <option value="resolved">Resolved only</option>
+        </select>
+        <select id="sort-mode" class="control-input" aria-label="Sort incidents">
+          <option value="newest">Sort: Newest first</option>
+          <option value="severity">Sort: High severity first</option>
+          <option value="open-first">Sort: Open first</option>
+          <option value="oldest">Sort: Oldest first</option>
+        </select>
       </section>
 
       <div id="incident-list" class="incident-list reveal reveal-delay-3" role="list" aria-label="Incident list"></div>
@@ -1329,6 +1340,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     let activeIncidentId = null;
     let searchQuery = '';
     let severityFilter = 'all';
+    let workflowFilter = 'all';
+    let sortMode = 'newest';
     let lastSyncedAt = null;
     let refreshTimer = null;
     let isExplainingIncident = false;
@@ -1665,6 +1678,16 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       document.getElementById('severity-filter').addEventListener('change', (event) => {
         severityFilter = event.target.value;
+        renderIncidentList();
+      });
+
+      document.getElementById('workflow-filter').addEventListener('change', (event) => {
+        workflowFilter = event.target.value;
+        renderIncidentList();
+      });
+
+      document.getElementById('sort-mode').addEventListener('change', (event) => {
+        sortMode = event.target.value;
         renderIncidentList();
       });
     }
