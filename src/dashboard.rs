@@ -1295,6 +1295,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         <div id="sync-state" class="sync-state">Auto-refresh on</div>
         <div class="sync-actions">
           <button id="notify-toggle" class="button button-secondary button-small" type="button">Browser alerts off</button>
+          <button id="notification-reset" class="button button-secondary button-small" type="button">Reset alerts</button>
           <div id="sync-time">Waiting for first sync</div>
         </div>
       </section>
@@ -1376,6 +1377,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       applySavedTheme();
       bindThemeToggle();
       bindNotificationToggle();
+      bindNotificationReset();
       bindFilters();
       bindVisibilityRefresh();
       renderEmptyDetail();
@@ -1517,6 +1519,18 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       } else {
         toggle.textContent = 'Browser alerts off';
       }
+    }
+
+    function bindNotificationReset() {
+      const reset = document.getElementById('notification-reset');
+      if (!reset) {
+        return;
+      }
+
+      reset.addEventListener('click', () => {
+        clearNotifiedIncidentIds();
+        showToast('Remembered incident alerts cleared. New incidents can notify again.');
+      });
     }
 
     function notifyOnNewIncidents(previousIncidentIds, nextIncidents) {
