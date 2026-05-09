@@ -1378,6 +1378,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       bindThemeToggle();
       bindNotificationToggle();
       bindNotificationReset();
+      applyUrlState();
       bindFilters();
       bindVisibilityRefresh();
       renderEmptyDetail();
@@ -1465,6 +1466,43 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
       toggle.setAttribute('aria-label', label);
       toggle.setAttribute('title', label);
+    }
+
+    function applyUrlState() {
+      const url = new URL(window.location.href);
+      searchQuery = (url.searchParams.get('q') || '').trim().toLowerCase();
+      severityFilter = url.searchParams.get('severity') || 'all';
+      workflowFilter = url.searchParams.get('workflow') || 'all';
+      sortMode = url.searchParams.get('sort') || 'newest';
+      syncFilterControls();
+    }
+
+    function syncFilterControls() {
+      const search = document.getElementById('incident-search');
+      const severity = document.getElementById('severity-filter');
+      const workflow = document.getElementById('workflow-filter');
+      const sort = document.getElementById('sort-mode');
+      if (search) search.value = searchQuery;
+      if (severity) severity.value = severityFilter;
+      if (workflow) workflow.value = workflowFilter;
+      if (sort) sort.value = sortMode;
+    }
+
+    function updateUrlState() {
+      const url = new URL(window.location.href);
+      setOrClearSearchParam(url, 'q', searchQuery);
+      setOrClearSearchParam(url, 'severity', severityFilter === 'all' ? '' : severityFilter);
+      setOrClearSearchParam(url, 'workflow', workflowFilter === 'all' ? '' : workflowFilter);
+      setOrClearSearchParam(url, 'sort', sortMode === 'newest' ? '' : sortMode);
+      window.history.replaceState({}, '', url);
+    }
+
+    function setOrClearSearchParam(url, key, value) {
+      if (value) {
+        url.searchParams.set(key, value);
+      } else {
+        url.searchParams.delete(key);
+      }
     }
 
     function bindNotificationToggle() {
@@ -1705,21 +1743,25 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     function bindFilters() {
       document.getElementById('incident-search').addEventListener('input', (event) => {
         searchQuery = event.target.value.trim().toLowerCase();
+        updateUrlState();
         renderIncidentList();
       });
 
       document.getElementById('severity-filter').addEventListener('change', (event) => {
         severityFilter = event.target.value;
+        updateUrlState();
         renderIncidentList();
       });
 
       document.getElementById('workflow-filter').addEventListener('change', (event) => {
         workflowFilter = event.target.value;
+        updateUrlState();
         renderIncidentList();
       });
 
       document.getElementById('sort-mode').addEventListener('change', (event) => {
         sortMode = event.target.value;
+        updateUrlState();
         renderIncidentList();
       });
     }
