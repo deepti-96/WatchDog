@@ -1532,7 +1532,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         : visibleIncidents()[0]?.id || null;
 
       if (!selectedIncidentId) {
-        renderEmptyDetail();
+        renderFilteredEmptyDetail();
         return;
       }
 
@@ -1866,6 +1866,12 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const visible = visibleIncidents();
       if (!visible.length) {
         container.innerHTML = '<div class="empty reveal in-view">No incidents match the current triage controls. Try clearing the search or relaxing the severity, workflow, or sort filters.</div>';
+        if (!incidents.length) {
+          return;
+        }
+        if (!activeIncidentId || !incidents.some((incident) => incident.id === activeIncidentId)) {
+          renderFilteredEmptyDetail();
+        }
         return;
       }
 
@@ -1952,6 +1958,14 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       document.getElementById('detail-panel').innerHTML = `
         <div class="empty reveal in-view">
           No incidents yet. Run the daemon and trigger a bad deploy simulation to populate the dashboard.
+        </div>
+      `;
+    }
+
+    function renderFilteredEmptyDetail() {
+      document.getElementById('detail-panel').innerHTML = `
+        <div class="empty reveal in-view">
+          No incident matches the current URL state. Adjust the triage controls or clear the filters to choose another incident.
         </div>
       `;
     }
