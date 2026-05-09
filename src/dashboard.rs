@@ -1474,6 +1474,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       severityFilter = url.searchParams.get('severity') || 'all';
       workflowFilter = url.searchParams.get('workflow') || 'all';
       sortMode = url.searchParams.get('sort') || 'newest';
+      const hash = window.location.hash.replace(/^#/, '');
+      activeIncidentId = hash.startsWith('incident=') ? decodeURIComponent(hash.slice('incident='.length)) : null;
       syncFilterControls();
     }
 
@@ -1494,6 +1496,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       setOrClearSearchParam(url, 'severity', severityFilter === 'all' ? '' : severityFilter);
       setOrClearSearchParam(url, 'workflow', workflowFilter === 'all' ? '' : workflowFilter);
       setOrClearSearchParam(url, 'sort', sortMode === 'newest' ? '' : sortMode);
+      url.hash = activeIncidentId ? `incident=${encodeURIComponent(activeIncidentId)}` : '';
       window.history.replaceState({}, '', url);
     }
 
@@ -1874,6 +1877,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     function beginDetailRequest(id) {
       activeIncidentId = id;
       detailRequestVersion += 1;
+      updateUrlState();
       renderIncidentList();
       return detailRequestVersion;
     }
