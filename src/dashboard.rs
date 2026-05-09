@@ -1380,6 +1380,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       bindNotificationReset();
       applyUrlState();
       bindFilters();
+      bindUrlNavigation();
       bindVisibilityRefresh();
       renderEmptyDetail();
       setupRevealObserver();
@@ -1506,6 +1507,41 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       } else {
         url.searchParams.delete(key);
       }
+    }
+
+    function bindUrlNavigation() {
+      window.addEventListener('popstate', () => {
+        syncDashboardToUrlState();
+      });
+      window.addEventListener('hashchange', () => {
+        syncDashboardToUrlState();
+      });
+    }
+
+    async function syncDashboardToUrlState() {
+      applyUrlState();
+      renderIncidentList();
+
+      if (!incidents.length) {
+        renderEmptyDetail();
+        return;
+      }
+
+      const selectedIncidentId = activeIncidentId && incidents.some((incident) => incident.id === activeIncidentId)
+        ? activeIncidentId
+        : visibleIncidents()[0]?.id || null;
+
+      if (!selectedIncidentId) {
+        renderEmptyDetail();
+        return;
+      }
+
+      if (selectedIncidentId !== activeIncidentId) {
+        activeIncidentId = selectedIncidentId;
+        renderIncidentList();
+      }
+
+      await selectIncident(selectedIncidentId, false, true);
     }
 
     function bindNotificationToggle() {
