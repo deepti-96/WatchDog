@@ -1345,6 +1345,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       </section>
 
       <div id="incident-list" class="incident-list reveal reveal-delay-3" role="list" aria-label="Incident list"></div>
+      <p class="meta reveal reveal-delay-3" style="margin-top: 8px;">Shortcuts: <code>/</code> search, <code>j</code>/<code>k</code> move, <code>e</code> explain, <code>Shift+R</code> regenerate, <code>Ctrl/Cmd+S</code> save notes.</p>
     </aside>
 
     <main class="panel detail" id="detail-panel" aria-live="polite"></main>
