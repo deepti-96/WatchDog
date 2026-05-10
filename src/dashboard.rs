@@ -2109,9 +2109,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <h3>Investigation Notes</h3>
                 <span class="muted">Persisted with the incident</span>
               </div>
-              <textarea id="incident-notes" class="notes-box" placeholder="Capture what you found, what changed, and what to check next...">${escapeHtml(incident.notes)}</textarea>
+              <textarea id="incident-notes" class="notes-box" placeholder="Capture what you found, what changed, and what to check next...">${escapeHtml(resolveIncidentNotesValue(incident))}</textarea>
               <div class="notes-actions">
-                <span class="muted">Notes are saved back into the incident file</span>
+                <span id="notes-draft-status" class="muted">${escapeHtml(renderNotesDraftStatus(incident))}</span>
                 <button class="button button-secondary" onclick="saveIncidentNotes('${incident.id}')">Save Notes</button>
               </div>
             </article>
@@ -2128,6 +2128,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       `;
 
       activateReveals(panel);
+      bindNotesDraft(incident);
     }
 
     function notesDraftStorageKey(id) {
@@ -2153,6 +2154,32 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     function resolveIncidentNotesValue(incident) {
       const draft = readNotesDraft(incident.id);
       return draft || incident.notes;
+    }
+
+    function renderNotesDraftStatus(incident) {
+      const draft = readNotesDraft(incident.id);
+      if (!draft) {
+        return 'Notes are saved back into the incident file';
+      }
+
+      if (draft === incident.notes) {
+        return 'Draft matches the saved notes';
+      }
+
+      return 'Draft saved locally until you press Save Notes';
+    }
+
+    function bindNotesDraft(incident) {
+      const textarea = document.getElementById('incident-notes');
+      const status = document.getElementById('notes-draft-status');
+      if (!textarea || !status) {
+        return;
+      }
+
+      textarea.addEventListener('input', () => {
+        persistNotesDraft(incident.id, textarea.value);
+        status.textContent = renderNotesDraftStatus({ ...incident, notes: incident.notes });
+      });
     }
 
     async function copyIncidentSummary(id) {
@@ -2188,6 +2215,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       }
 
       const incident = await response.json();
+      clearNotesDraft(id);
       await loadIncidents({ silent: true });
       if (!isLatestDetailRequest(id, requestVersion)) {
         return;
@@ -2209,6 +2237,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       }
 
       const incident = await response.json();
+      clearNotesDraft(id);
       await loadIncidents({ silent: true });
       if (!isLatestDetailRequest(id, requestVersion)) {
         return;
