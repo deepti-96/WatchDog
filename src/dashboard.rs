@@ -1381,6 +1381,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       bindNotificationReset();
       applyUrlState();
       bindFilters();
+      bindKeyboardShortcuts();
       bindUrlNavigation();
       bindVisibilityRefresh();
       renderEmptyDetail();
@@ -1843,6 +1844,72 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function workflowRank(status) {
       return status === 'open' ? 0 : 1;
+    }
+
+    function bindKeyboardShortcuts() {
+      window.addEventListener('keydown', (event) => {
+        const activeTag = document.activeElement?.tagName?.toLowerCase();
+        const isEditable = document.activeElement?.isContentEditable || activeTag === 'textarea' || activeTag === 'select' || activeTag === 'input';
+
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+          const notes = document.getElementById('incident-notes');
+          if (notes && document.activeElement === notes && activeIncidentId) {
+            event.preventDefault();
+            saveIncidentNotes(activeIncidentId);
+          }
+          return;
+        }
+
+        if (event.key === '/' && !isEditable) {
+          event.preventDefault();
+          document.getElementById('incident-search')?.focus();
+          return;
+        }
+
+        if (isEditable) {
+          return;
+        }
+
+        if (event.key === 'j') {
+          event.preventDefault();
+          focusAdjacentIncident(1);
+          return;
+        }
+
+        if (event.key === 'k') {
+          event.preventDefault();
+          focusAdjacentIncident(-1);
+          return;
+        }
+
+        if (event.key === 'e' && activeIncidentId) {
+          event.preventDefault();
+          explainIncident(activeIncidentId);
+          return;
+        }
+
+        if (event.key === 'R' && activeIncidentId) {
+          event.preventDefault();
+          regenerateExplanation(activeIncidentId);
+        }
+      });
+    }
+
+    function focusAdjacentIncident(direction) {
+      const visible = visibleIncidents();
+      if (!visible.length) {
+        return;
+      }
+
+      const currentIndex = visible.findIndex((incident) => incident.id === activeIncidentId);
+      const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = Math.min(visible.length - 1, Math.max(0, safeIndex + direction));
+      const nextIncident = visible[nextIndex];
+      if (!nextIncident || nextIncident.id === activeIncidentId) {
+        return;
+      }
+
+      selectIncident(nextIncident.id);
     }
 
     function renderSidebarStats() {
