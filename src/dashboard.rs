@@ -1368,6 +1368,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     const THEME_KEY = 'watchdog-theme';
     const NOTIFICATION_PREF_KEY = 'watchdog-browser-alerts';
     const NOTIFIED_INCIDENTS_KEY = 'watchdog-notified-incidents';
+    const NOTES_DRAFT_PREFIX = 'watchdog-notes-draft:';
     const BASE_REFRESH_INTERVAL_MS = 5000;
     const MAX_REFRESH_INTERVAL_MS = 30000;
     const MAX_STORED_NOTIFICATIONS = 80;
@@ -2129,6 +2130,30 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       activateReveals(panel);
     }
 
+    function notesDraftStorageKey(id) {
+      return `${NOTES_DRAFT_PREFIX}${id}`;
+    }
+
+    function readNotesDraft(id) {
+      return localStorage.getItem(notesDraftStorageKey(id)) || '';
+    }
+
+    function persistNotesDraft(id, value) {
+      if (value.trim()) {
+        localStorage.setItem(notesDraftStorageKey(id), value);
+      } else {
+        clearNotesDraft(id);
+      }
+    }
+
+    function clearNotesDraft(id) {
+      localStorage.removeItem(notesDraftStorageKey(id));
+    }
+
+    function resolveIncidentNotesValue(incident) {
+      const draft = readNotesDraft(incident.id);
+      return draft || incident.notes;
+    }
 
     async function copyIncidentSummary(id) {
       try {
