@@ -2122,6 +2122,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <button class="button button-primary" ${loading ? 'disabled' : ''} onclick="explainIncident('${incident.id}')">${loading ? 'Explaining…' : 'Explain Incident'}</button>
             <button class="button button-secondary" ${loading ? 'disabled' : ''} onclick="regenerateExplanation('${incident.id}')">${loading ? 'Refreshing…' : 'Regenerate Explanation'}</button>
             <button class="button button-secondary" onclick="loadIncidents()">Refresh Incidents</button>
+            <button class="button button-secondary" onclick="copyIncidentLink('${incident.id}')">Copy Link</button>
             <button class="button button-secondary" onclick="copyIncidentSummary('${incident.id}')">Copy Summary</button>
             <a class="refresh-link" href="/api/incidents/${incident.id}/export/markdown">Download Markdown</a>
             <a class="refresh-link" href="/api/incidents/${incident.id}/export/json">Download JSON</a>
@@ -2274,6 +2275,23 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         persistNotesDraft(incident.id, textarea.value);
         status.textContent = renderNotesDraftStatus({ ...incident, notes: incident.notes });
       });
+    }
+
+    async function copyIncidentLink(id) {
+      try {
+        const url = new URL(window.location.href);
+        url.hash = `incident=${encodeURIComponent(id)}`;
+        const link = url.toString();
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(link);
+          showToast('Incident link copied to clipboard.');
+          return;
+        }
+
+        showToast(link);
+      } catch (error) {
+        showToast(`Could not copy incident link. ${error.message || String(error)}`, 'warning');
+      }
     }
 
     async function copyIncidentSummary(id) {
