@@ -1375,6 +1375,32 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     const MAX_STORED_NOTIFICATIONS = 80;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    function readStorage(key) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (_error) {
+        return null;
+      }
+    }
+
+    function writeStorage(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    function removeStorage(key) {
+      try {
+        window.localStorage.removeItem(key);
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       applySavedTheme();
       bindThemeToggle();
@@ -1447,7 +1473,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     function applySavedTheme() {
-      const savedTheme = localStorage.getItem(THEME_KEY);
+      const savedTheme = readStorage(THEME_KEY);
       const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const theme = savedTheme || (systemDark ? 'dark' : 'light');
       document.documentElement.setAttribute('data-theme', theme);
@@ -1460,7 +1486,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         const current = document.documentElement.getAttribute('data-theme') || 'light';
         const next = current === 'dark' ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem(THEME_KEY, next);
+        writeStorage(THEME_KEY, next);
         updateThemeToggleLabel(toggle);
       });
     }
@@ -1558,7 +1584,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
         if (Notification.permission === 'granted') {
           const nextEnabled = !browserNotificationsEnabled();
-          localStorage.setItem(NOTIFICATION_PREF_KEY, nextEnabled ? 'on' : 'off');
+          writeStorage(NOTIFICATION_PREF_KEY, nextEnabled ? 'on' : 'off');
           updateNotificationToggle(toggle);
           showToast(nextEnabled ? 'Browser notifications enabled for new incidents.' : 'Browser notifications turned off. In-app alerts stay on.');
           return;
@@ -1566,11 +1592,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-          localStorage.setItem(NOTIFICATION_PREF_KEY, 'on');
+          writeStorage(NOTIFICATION_PREF_KEY, 'on');
           updateNotificationToggle(toggle);
           showToast('Browser notifications enabled for new incidents.');
         } else {
-          localStorage.setItem(NOTIFICATION_PREF_KEY, 'off');
+          writeStorage(NOTIFICATION_PREF_KEY, 'off');
           updateNotificationToggle(toggle);
           showToast('Browser notifications were not enabled. In-app alerts stay on.', 'warning');
         }
@@ -1578,7 +1604,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     function browserNotificationsEnabled() {
-      return localStorage.getItem(NOTIFICATION_PREF_KEY) === 'on';
+      return readStorage(NOTIFICATION_PREF_KEY) === 'on';
     }
 
     function updateNotificationToggle(toggle = document.getElementById('notify-toggle')) {
@@ -1647,7 +1673,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function readNotifiedIncidentIds() {
       try {
-        const raw = localStorage.getItem(NOTIFIED_INCIDENTS_KEY);
+        const raw = readStorage(NOTIFIED_INCIDENTS_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
         return new Set(Array.isArray(parsed) ? parsed : []);
       } catch (_error) {
@@ -1657,11 +1683,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function persistNotifiedIncidentIds(notifiedIncidentIds) {
       const trimmed = Array.from(notifiedIncidentIds).slice(-MAX_STORED_NOTIFICATIONS);
-      localStorage.setItem(NOTIFIED_INCIDENTS_KEY, JSON.stringify(trimmed));
+      writeStorage(NOTIFIED_INCIDENTS_KEY, JSON.stringify(trimmed));
     }
 
     function clearNotifiedIncidentIds() {
-      localStorage.removeItem(NOTIFIED_INCIDENTS_KEY);
+      removeStorage(NOTIFIED_INCIDENTS_KEY);
     }
 
     function showToast(message, tone = 'info', incident = null) {
@@ -2204,19 +2230,19 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     function readNotesDraft(id) {
-      return localStorage.getItem(notesDraftStorageKey(id)) || '';
+      return readStorage(notesDraftStorageKey(id)) || '';
     }
 
     function persistNotesDraft(id, value) {
       if (value.trim()) {
-        localStorage.setItem(notesDraftStorageKey(id), value);
+        writeStorage(notesDraftStorageKey(id), value);
       } else {
         clearNotesDraft(id);
       }
     }
 
     function clearNotesDraft(id) {
-      localStorage.removeItem(notesDraftStorageKey(id));
+      removeStorage(notesDraftStorageKey(id));
     }
 
     function resolveIncidentNotesValue(incident) {
