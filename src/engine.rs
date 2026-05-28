@@ -1,5 +1,6 @@
 use crate::buffer::RingBuffer;
-use crate::detector::ChangeDetector;
+use crate::config::{DEFAULT_BASELINE_CAPACITY, DEFAULT_MONITORING_WINDOW_SECS};
+use crate::detector::{ChangeDetector, DetectorSettings};
 use crate::logs::{extract_error_signature, ErrorRingBuffer};
 use crate::model::{
     BaselineSnapshot, DeployEvent, IncidentMetricComparison, IncidentTimelineEvent, LogEvent,
@@ -31,13 +32,38 @@ pub struct WatchdogEngine {
     active_deploy: Option<ActiveDeploy>,
 }
 
+#[derive(Debug, Clone)]
+pub struct EngineConfig {
+    pub baseline_capacity: usize,
+    pub monitoring_window_secs: i64,
+    pub detector: DetectorSettings,
+}
+
+impl Default for EngineConfig {
+    fn default() -> Self {
+        Self {
+            baseline_capacity: DEFAULT_BASELINE_CAPACITY,
+            monitoring_window_secs: DEFAULT_MONITORING_WINDOW_SECS as i64,
+            detector: DetectorSettings::default(),
+        }
+    }
+}
+
 impl WatchdogEngine {
     pub fn new(baseline_capacity: usize, monitoring_window_secs: i64) -> Self {
+        Self::with_config(EngineConfig {
+            baseline_capacity,
+            monitoring_window_secs,
+            detector: DetectorSettings::default(),
+        })
+    }
+
+    pub fn with_config(config: EngineConfig) -> Self {
         Self {
-            ring: RingBuffer::new(baseline_capacity),
-            detector: ChangeDetector::new(),
-            error_ring: ErrorRingBuffer::new(baseline_capacity),
-            monitoring_window: Duration::seconds(monitoring_window_secs),
+            ring: RingBuffer::new(config.baseline_capacity),
+            detector: ChangeDetector::with_settings(config.detector),
+            error_ring: ErrorRingBuffer::new(config.baseline_capacity),
+            monitoring_window: Duration::seconds(config.monitoring_window_secs),
             active_deploy: None,
         }
     }
