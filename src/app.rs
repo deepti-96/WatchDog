@@ -1,8 +1,9 @@
 use crate::alert;
 use crate::benchmark;
 use crate::cli::{Cli, Command};
+use crate::config::WatchdogConfig;
 use crate::dashboard;
-use crate::engine::WatchdogEngine;
+use crate::engine::{EngineConfig, WatchdogEngine};
 use crate::model::{DeployEvent, MetricSample};
 use crate::storage;
 use crate::tail::LogTailer;
@@ -26,10 +27,11 @@ pub async fn run() -> Result<()> {
     match cli.command {
         Command::Run {
             state_dir,
+            config,
             log_file,
             monitoring_window_secs,
             webhook_url,
-        } => run_daemon(state_dir, log_file, monitoring_window_secs, webhook_url).await,
+        } => run_daemon(state_dir, config, log_file, monitoring_window_secs, webhook_url).await,
         Command::Serve {
             state_dir,
             host,
@@ -54,34 +56,45 @@ pub async fn run() -> Result<()> {
 
 async fn run_daemon(
     state_dir: PathBuf,
+    config_path: Option<PathBuf>,
     log_file: Option<PathBuf>,
-    monitoring_window_secs: u64,
+    monitoring_window_secs: Option<u64>,
     webhook_url: Option<String>,
 ) -> Result<()> {
     ensure_state_dir(&state_dir)?;
+    let settings = WatchdogConfig::load(config_path.as_deref())?
+        .resolve_run_settings(log_file, monitoring_window_secs, webhook_url);
     let metrics_path = state_dir.join("metrics.jsonl");
     let deploys_path = state_dir.join("deploy-events.jsonl");
     touch(&metrics_path)?;
     touch(&deploys_path)?;
 
-    let log_path = log_file.unwrap_or_else(|| state_dir.join("app.log"));
+    let log_path = settings.log_file.unwrap_or_else(|| state_dir.join("app.log"));
     let mut tailer = LogTailer::new(log_path);
     tailer.ensure_exists()?;
 
     let mut metric_cursor = 0usize;
     let mut deploy_cursor = 0usize;
-    let mut engine = WatchdogEngine::new(120, monitoring_window_secs as i64);
+    let mut engine = WatchdogEngine::with_config(EngineConfig {
+        baseline_capacity: settings.baseline_capacity,
+        monitoring_window_secs: settings.monitoring_window_secs as i64,
+        detector: settings.detector,
+    });
 
     info!("watchdog daemon started");
     info!("state dir: {}", state_dir.display());
     info!("tailing log file: {}", tailer.path().display());
+    info!(
+        "baseline capacity: {}, monitoring window: {}s",
+        settings.baseline_capacity, settings.monitoring_window_secs
+    );
 
     loop {
         for sample in read_new_jsonl::<MetricSample>(&metrics_path, &mut metric_cursor)? {
             if let Some(verdict) = engine.ingest_metric(sample) {
                 let message = alert::render(&verdict);
                 println!("{message}");
-                if let Some(url) = &webhook_url {
+                if let Some(url) = &settings.webhook_url {
                     if let Err(error) = alert::send_webhook(url, &message).await {
                         warn!("failed to send webhook alert: {error:#}");
                     }

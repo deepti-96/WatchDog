@@ -15,9 +15,11 @@ pub enum Command {
         #[arg(long, default_value = ".watchdog")]
         state_dir: PathBuf,
         #[arg(long)]
+        config: Option<PathBuf>,
+        #[arg(long)]
         log_file: Option<PathBuf>,
-        #[arg(long, default_value_t = 300)]
-        monitoring_window_secs: u64,
+        #[arg(long)]
+        monitoring_window_secs: Option<u64>,
         #[arg(long)]
         webhook_url: Option<String>,
     },
