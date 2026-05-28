@@ -1,6 +1,25 @@
 use crate::model::{BaselineSnapshot, MetricSample};
 
 #[derive(Debug, Clone)]
+pub struct DetectorSettings {
+    pub error_threshold: f64,
+    pub error_drift: f64,
+    pub latency_threshold: f64,
+    pub latency_drift: f64,
+}
+
+impl Default for DetectorSettings {
+    fn default() -> Self {
+        Self {
+            error_threshold: 0.08,
+            error_drift: 0.002,
+            latency_threshold: 120.0,
+            latency_drift: 5.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Cusum {
     threshold: f64,
     drift: f64,
@@ -33,10 +52,10 @@ pub struct ChangeDetector {
 }
 
 impl ChangeDetector {
-    pub fn new() -> Self {
+    pub fn with_settings(settings: DetectorSettings) -> Self {
         Self {
-            error_cusum: Cusum::new(0.08, 0.002),
-            latency_cusum: Cusum::new(120.0, 5.0),
+            error_cusum: Cusum::new(settings.error_threshold, settings.error_drift),
+            latency_cusum: Cusum::new(settings.latency_threshold, settings.latency_drift),
         }
     }
 
