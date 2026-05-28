@@ -55,6 +55,31 @@ cargo run -- simulate --state-dir .WatchDog --deploy v1.4.2 --bad-deploy
 cargo run -- run --state-dir .WatchDog
 ```
 
+Run with a JSON config file:
+
+```bash
+cargo run -- run --state-dir .WatchDog --config watchdog.config.json
+```
+
+Example config:
+
+```json
+{
+  "baseline_capacity": 120,
+  "monitoring_window_secs": 300,
+  "log_file": ".WatchDog/app.log",
+  "webhook_url": "https://hooks.example.test/watchdog",
+  "detector": {
+    "error_threshold": 0.08,
+    "error_drift": 0.002,
+    "latency_threshold": 120.0,
+    "latency_drift": 5.0
+  }
+}
+```
+
+CLI flags such as `--log-file`, `--monitoring-window-secs`, and `--webhook-url` override config file values.
+
 Record a real deploy event:
 
 ```bash
@@ -103,6 +128,5 @@ A tiny deploy hook is included at [`examples/deploy.sh`](./examples/deploy.sh). 
 
 - Prometheus or OpenTelemetry metrics ingestion
 - Slack-specific alert formatting with timelines
-- Config file support for thresholds and monitoring windows
 - Log anomaly detection as a second signal after metrics
 - GitHub Actions or container deploy integration for end-to-end demos
