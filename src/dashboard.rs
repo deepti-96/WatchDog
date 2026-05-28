@@ -230,26 +230,26 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
   <title>watchdog dashboard</title>
   <style>
     :root {
-      --bg: #f5efe4;
-      --bg-strong: #fdf9f2;
-      --surface: rgba(255, 251, 244, 0.8);
-      --surface-strong: rgba(255, 255, 255, 0.96);
-      --surface-tint: rgba(244, 236, 223, 0.72);
-      --ink: #17202a;
-      --muted: #5a6674;
-      --line: rgba(180, 158, 129, 0.28);
-      --line-strong: rgba(138, 118, 95, 0.38);
-      --accent: #0f766e;
-      --accent-strong: #0a5b55;
-      --accent-soft: rgba(15, 118, 110, 0.11);
-      --accent-glow: rgba(15, 118, 110, 0.18);
-      --danger: #991b1b;
+      --bg: #f7fbff;
+      --bg-strong: #ffffff;
+      --surface: rgba(255, 255, 255, 0.94);
+      --surface-strong: rgba(255, 255, 255, 0.99);
+      --surface-tint: rgba(237, 245, 252, 0.82);
+      --ink: #111827;
+      --muted: #3f4b5f;
+      --line: rgba(94, 116, 145, 0.3);
+      --line-strong: rgba(58, 75, 102, 0.42);
+      --accent: #087f73;
+      --accent-strong: #075f57;
+      --accent-soft: rgba(8, 127, 115, 0.12);
+      --accent-glow: rgba(8, 127, 115, 0.14);
+      --danger: #b91c1c;
       --danger-soft: rgba(220, 38, 38, 0.12);
-      --warning: #9a3412;
+      --warning: #b45309;
       --warning-soft: rgba(234, 88, 12, 0.12);
-      --shadow-lg: 0 28px 80px rgba(23, 32, 42, 0.14);
-      --shadow-md: 0 16px 42px rgba(23, 32, 42, 0.1);
-      --shadow-sm: 0 10px 24px rgba(23, 32, 42, 0.08);
+      --shadow-lg: 0 26px 70px rgba(17, 24, 39, 0.1);
+      --shadow-md: 0 14px 34px rgba(17, 24, 39, 0.08);
+      --shadow-sm: 0 8px 20px rgba(17, 24, 39, 0.06);
       --focus: #0b7f74;
       --radius-xl: 30px;
       --radius-lg: 24px;
@@ -293,9 +293,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       font-family: Georgia, "Times New Roman", serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 0% 0%, rgba(15, 118, 110, 0.16), transparent 24%),
-        radial-gradient(circle at 100% 0%, rgba(153, 27, 27, 0.09), transparent 22%),
-        linear-gradient(180deg, #fbf6ed 0%, var(--bg) 100%);
+        radial-gradient(circle at 0% 0%, rgba(8, 127, 115, 0.08), transparent 25%),
+        radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.06), transparent 24%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
       overflow-x: hidden;
       transition: background 220ms ease, color 220ms ease;
     }
@@ -313,9 +313,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       inset: 0;
       pointer-events: none;
       background:
-        linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.26) 45%, transparent 70%),
-        radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), transparent 28%);
-      opacity: 0.8;
+        linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.34) 45%, transparent 70%),
+        radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.55), transparent 28%);
+      opacity: 0.72;
       transition: opacity 220ms ease;
     }
 
@@ -354,7 +354,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       border: 1px solid var(--line);
       border-radius: var(--radius-xl);
       background: var(--surface);
-      backdrop-filter: blur(18px);
+      backdrop-filter: blur(14px);
       box-shadow: var(--shadow-lg);
       transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
     }
@@ -364,7 +364,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       position: absolute;
       inset: 0;
       pointer-events: none;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 28%);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), transparent 28%);
     }
 
     html[data-theme="dark"] .panel::before {
@@ -413,7 +413,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     h1, h2, h3, h4 {
       line-height: 1.04;
       font-weight: 600;
-      letter-spacing: -0.04em;
+      letter-spacing: 0;
     }
 
     h1 { font-size: clamp(2.5rem, 3vw, 3.25rem); }
@@ -442,25 +442,36 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .sync-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr;
+      align-items: stretch;
       gap: 12px;
-      padding: 10px 12px;
+      padding: 12px;
       border-radius: 14px;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.52);
-      color: var(--muted);
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--ink);
       font-size: 0.84rem;
       box-shadow: var(--shadow-sm);
     }
 
     .sync-actions {
-      display: inline-flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
+      align-items: stretch;
+    }
+
+    .sync-actions .button {
+      width: 100%;
+      min-width: 0;
+      white-space: normal;
+    }
+
+    #sync-time {
+      grid-column: 1 / -1;
+      color: var(--muted);
+      line-height: 1.35;
     }
 
     html[data-theme="dark"] .sync-bar {
@@ -471,6 +482,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      color: var(--ink);
+      font-weight: 700;
     }
 
     .sync-state::before {
@@ -499,7 +512,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .theme-toggle {
       appearance: none;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.46);
+      background: rgba(255, 255, 255, 0.88);
       color: var(--ink);
       width: 46px;
       height: 46px;
@@ -534,7 +547,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       gap: 14px;
       padding: 14px 16px;
       border-radius: var(--radius-md);
-      background: linear-gradient(135deg, rgba(23, 32, 42, 0.94), rgba(15, 118, 110, 0.9));
+      background: linear-gradient(135deg, #111827, #087f73);
       color: white;
       box-shadow: var(--shadow-md);
       overflow: hidden;
@@ -594,7 +607,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 12px 14px;
-      background: rgba(255, 255, 255, 0.78);
+      background: rgba(255, 255, 255, 0.94);
       color: var(--ink);
       box-shadow: var(--shadow-sm);
       transition: border-color 160ms ease, background 220ms ease, color 220ms ease;
@@ -643,7 +656,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .timeline-item,
     .empty,
     .skeleton {
-      border: 1px solid var(--line);
+      border: 1px solid var(--line-strong);
       border-radius: var(--radius-lg);
       background: var(--surface-strong);
       box-shadow: var(--shadow-sm);
@@ -657,13 +670,18 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       padding: 16px;
     }
 
+    .mini-card,
+    .stat-card {
+      border-left: 4px solid var(--accent);
+    }
+
     .mini-card strong,
     .stat-card strong,
     .signal-card strong {
       display: block;
       margin-top: 10px;
       font-size: 1.65rem;
-      letter-spacing: -0.05em;
+      letter-spacing: 0;
     }
 
     .label {
@@ -674,7 +692,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .signal-card {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(251, 247, 240, 0.96));
+      background: linear-gradient(180deg, #ffffff, #f4f9fb);
       position: relative;
       overflow: hidden;
     }
@@ -713,7 +731,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       cursor: pointer;
       text-align: left;
       transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(252, 247, 239, 0.76));
+      background: linear-gradient(180deg, #ffffff, #f6fafc);
+      border-left: 4px solid transparent;
     }
 
     html[data-theme="dark"] .incident-card {
@@ -723,9 +742,10 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .incident-card:hover,
     .incident-card.active {
       transform: translateY(-2px);
-      border-color: rgba(15, 118, 110, 0.34);
-      background: linear-gradient(180deg, rgba(230, 247, 244, 0.9), rgba(248, 252, 251, 0.92));
+      border-color: rgba(15, 118, 110, 0.38);
+      background: linear-gradient(180deg, #eaf8f6, #ffffff);
       box-shadow: 0 18px 32px rgba(15, 118, 110, 0.12);
+      border-left-color: var(--accent);
     }
 
     html[data-theme="dark"] .incident-card:hover,
@@ -766,7 +786,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     .badge.high { background: var(--danger-soft); color: var(--danger); }
     .badge.medium { background: var(--accent-soft); color: var(--accent-strong); }
-    .badge.environment { background: rgba(23, 32, 42, 0.07); color: var(--ink); border-color: rgba(23, 32, 42, 0.06); }
+    .badge.environment { background: rgba(17, 24, 39, 0.07); color: var(--ink); border-color: rgba(17, 24, 39, 0.08); }
     .badge.subtle { background: rgba(15, 118, 110, 0.08); color: var(--accent-strong); }
     .badge.open { background: rgba(245, 158, 11, 0.16); color: #b45309; }
     .badge.resolved { background: rgba(34, 197, 94, 0.16); color: #15803d; }
@@ -778,8 +798,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 20px;
+      grid-template-columns: minmax(420px, 1fr) minmax(320px, 520px);
+      gap: 24px;
       align-items: start;
       padding-bottom: 22px;
       border-bottom: 1px solid var(--line);
@@ -792,11 +812,21 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
-      justify-content: flex-end;
-      align-items: flex-start;
+      justify-self: end;
+      width: min(100%, 520px);
+    }
+
+    .hero-actions .button,
+    .hero-actions .refresh-link {
+      width: 100%;
+      min-width: 0;
+      justify-content: center;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.2;
     }
 
     .button,
@@ -819,8 +849,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .button-primary {
       color: white;
       min-width: 170px;
-      background: linear-gradient(135deg, var(--ink), #233242);
-      box-shadow: 0 14px 24px rgba(23, 32, 42, 0.18);
+      background: linear-gradient(135deg, #111827, #26364b);
+      box-shadow: 0 14px 24px rgba(17, 24, 39, 0.16);
     }
 
     html[data-theme="dark"] .button-primary {
@@ -835,9 +865,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .button-secondary {
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.9);
       color: var(--ink);
-      border-color: var(--line);
+      border-color: var(--line-strong);
     }
 
     html[data-theme="dark"] .button-secondary,
@@ -849,21 +879,22 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.9);
       color: var(--ink);
-      border-color: var(--line);
+      border-color: var(--line-strong);
     }
 
     .button-small {
-      padding: 9px 12px;
+      padding: 8px 10px;
       border-radius: 12px;
       font-size: 0.78rem;
       letter-spacing: 0.02em;
+      line-height: 1.2;
     }
 
     .section-card {
       padding: 18px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(251, 247, 239, 0.94));
+      background: linear-gradient(180deg, #ffffff, #f7fbff);
     }
 
     html[data-theme="dark"] .section-card,
@@ -897,7 +928,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .compare-card {
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(250, 246, 238, 0.92));
+      background: linear-gradient(180deg, #ffffff, #f7fbff);
     }
 
     .compare-card h4 {
@@ -913,7 +944,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .compare-chart-grid {
-      stroke: rgba(180, 158, 129, 0.18);
+      stroke: rgba(123, 145, 169, 0.2);
       stroke-width: 1;
       stroke-dasharray: 3 5;
     }
@@ -961,7 +992,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       gap: 16px;
       align-items: baseline;
       padding: 10px 0;
-      border-top: 1px solid rgba(180, 158, 129, 0.18);
+      border-top: 1px solid rgba(123, 145, 169, 0.22);
     }
 
     .compare-row:first-of-type {
@@ -977,8 +1008,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     pre {
       margin: 0;
       border-radius: var(--radius-md);
-      border: 1px solid rgba(180, 158, 129, 0.2);
-      background: rgba(251, 248, 241, 0.96);
+      border: 1px solid rgba(123, 145, 169, 0.22);
+      background: rgba(255, 255, 255, 0.96);
       padding: 16px;
       line-height: 1.65;
       white-space: pre-wrap;
@@ -1006,7 +1037,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       border: 1px solid var(--line);
       border-radius: 16px;
       padding: 14px;
-      background: rgba(255, 255, 255, 0.72);
+      background: rgba(255, 255, 255, 0.95);
       color: var(--ink);
       resize: vertical;
       box-shadow: var(--shadow-sm);
@@ -1036,7 +1067,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       align-items: start;
       padding: 16px;
       position: relative;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(252, 247, 239, 0.86));
+      background: linear-gradient(180deg, #ffffff, #f7fbff);
     }
 
     .timeline-item::before {
@@ -1070,7 +1101,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       padding: 26px;
       color: var(--muted);
       border-style: dashed;
-      background: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.86);
     }
 
     .loading-state {
@@ -1081,7 +1112,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .skeleton {
       position: relative;
       overflow: hidden;
-      background: rgba(255, 255, 255, 0.68);
+      background: rgba(255, 255, 255, 0.88);
       min-height: 96px;
     }
 
@@ -1174,7 +1205,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     .toast strong {
       font-size: 0.98rem;
-      letter-spacing: -0.03em;
+      letter-spacing: 0;
     }
 
     .toast p {
@@ -1264,9 +1295,29 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
       .panel { border-radius: 22px; }
       .sidebar, .detail { padding: 18px; }
-      .hero { grid-template-columns: 1fr; }
-      .hero-actions { justify-content: stretch; }
-      .button-primary, .button-secondary, .refresh-link { width: 100%; }
+      .hero {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        padding-bottom: 16px;
+      }
+      .hero-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        justify-content: stretch;
+      }
+      .hero-actions .button,
+      .hero-actions .refresh-link {
+        width: 100%;
+        min-width: 0;
+        padding: 10px 9px;
+        border-radius: 13px;
+        line-height: 1.2;
+        text-align: center;
+      }
+      .hero-actions .button-primary {
+        grid-column: 1 / -1;
+      }
       .overview-grid, .sidebar-stats, .compare-grid { grid-template-columns: 1fr; }
       .timeline-item { grid-template-columns: 1fr; }
       .timeline-time, .timeline-content { padding-left: 18px; }
