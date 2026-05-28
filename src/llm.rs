@@ -1,4 +1,4 @@
-use crate::model::{Incident, IncidentMetricComparison, IncidentTimelineEvent};
+use crate::model::Incident;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -74,6 +74,7 @@ fn build_incident_prompt(incident: &Incident) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{IncidentMetricComparison, IncidentTimelineEvent};
     use chrono::Utc;
 
     #[test]

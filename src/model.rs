@@ -83,10 +83,18 @@ pub struct Incident {
     pub summary: String,
     pub verdict: RegressionVerdict,
     pub alert_text: String,
+    #[serde(default)]
     pub cached_explanation: Option<String>,
+    #[serde(default)]
     pub cached_explanation_updated_at: Option<DateTime<Utc>>,
+    #[serde(default = "default_incident_status")]
     pub status: String,
+    #[serde(default)]
     pub notes: String,
+}
+
+fn default_incident_status() -> String {
+    INCIDENT_STATUS_OPEN.to_string()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -127,5 +135,44 @@ mod tests {
         assert_eq!(normalize_incident_status("open"), Some(INCIDENT_STATUS_OPEN));
         assert_eq!(normalize_incident_status(" RESOLVED "), Some(INCIDENT_STATUS_RESOLVED));
         assert_eq!(normalize_incident_status("invalid"), None);
+    }
+
+    #[test]
+    fn incident_deserializes_legacy_files_without_workflow_fields() {
+        let json = r#"{
+          "id": "1777100351-v1-4-2",
+          "created_at": "2026-04-25T06:58:40.978592Z",
+          "severity": "high",
+          "summary": "v1.4.2 regression in demo",
+          "verdict": {
+            "deploy_id": "v1.4.2",
+            "environment": "demo",
+            "deploy_timestamp": "2026-04-25T06:59:08.239477Z",
+            "detected_at": "2026-04-25T06:59:11.239477Z",
+            "seconds_after_deploy": 3,
+            "error_rate_delta": 0.088,
+            "latency_delta_ms": 142.8,
+            "reason": "error rate and latency shifted above baseline",
+            "top_error_signature": null,
+            "top_error_count": 0,
+            "top_error_is_new": false,
+            "comparison": {
+              "baseline_error_rate": 0.012,
+              "detected_error_rate": 0.1,
+              "baseline_latency_ms": 117.2,
+              "detected_latency_ms": 260.0,
+              "request_rate_at_detection": 405.0
+            },
+            "timeline": []
+          },
+          "alert_text": "watchdog detected a deployment regression"
+        }"#;
+
+        let incident: Incident = serde_json::from_str(json).expect("legacy incident should load");
+
+        assert_eq!(incident.status, INCIDENT_STATUS_OPEN);
+        assert_eq!(incident.notes, "");
+        assert!(incident.cached_explanation.is_none());
+        assert!(incident.cached_explanation_updated_at.is_none());
     }
 }
