@@ -3,6 +3,7 @@ mod app;
 mod benchmark;
 mod buffer;
 mod cli;
+mod config;
 mod dashboard;
 mod detector;
 mod engine;
