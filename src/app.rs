@@ -95,7 +95,7 @@ async fn run_daemon(
                 let message = alert::render(&verdict);
                 println!("{message}");
                 if let Some(url) = &settings.webhook_url {
-                    if let Err(error) = alert::send_webhook(url, &message).await {
+                    if let Err(error) = alert::send_webhook(url, &message, &verdict).await {
                         warn!("failed to send webhook alert: {error:#}");
                     }
                 }
