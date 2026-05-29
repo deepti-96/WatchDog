@@ -80,6 +80,8 @@ Example config:
 
 CLI flags such as `--log-file`, `--monitoring-window-secs`, and `--webhook-url` override config file values.
 
+Slack incoming webhook URLs get a richer alert payload with Block Kit sections for the regression summary, metric deltas, dominant error signature, and timeline. Other webhook URLs receive the plain text alert body.
+
 Record a real deploy event:
 
 ```bash
@@ -127,6 +129,5 @@ A tiny deploy hook is included at [`examples/deploy.sh`](./examples/deploy.sh). 
 ## What to build next
 
 - Prometheus or OpenTelemetry metrics ingestion
-- Slack-specific alert formatting with timelines
 - Log anomaly detection as a second signal after metrics
 - GitHub Actions or container deploy integration for end-to-end demos
