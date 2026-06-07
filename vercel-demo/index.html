@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WatchDog demo</title>
+  <style>
+    :root {
+      --bg: #f6f9fc;
+      --surface: #ffffff;
+      --surface-soft: #eef6f5;
+      --ink: #111827;
+      --muted: #4b5563;
+      --line: #cbd5e1;
+      --accent: #0f766e;
+      --accent-dark: #0b4f49;
+      --danger: #b91c1c;
+      --warning: #b45309;
+      --ok: #15803d;
+      --shadow: 0 24px 70px rgba(15, 23, 42, 0.11);
+      --shadow-sm: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(120deg, rgba(15, 118, 110, 0.1), transparent 34%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+    }
+
+    button, input, textarea { font: inherit; }
+
+    .shell {
+      width: min(1200px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+    }
+
+    .mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #111827, var(--accent));
+      box-shadow: var(--shadow-sm);
+    }
+
+    .demo-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.8);
+      font-size: 0.9rem;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .hero-main,
+    .panel,
+    .metric,
+    .timeline-item,
+    .slack-alert {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .hero-main {
+      border-radius: 24px;
+      padding: 28px;
+      display: grid;
+      align-content: space-between;
+      min-height: 430px;
+    }
+
+    .eyebrow {
+      color: var(--accent-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 800;
+      font-size: 0.78rem;
+      margin-bottom: 14px;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(2.4rem, 5vw, 4.8rem);
+      line-height: 0.98;
+      letter-spacing: 0;
+      max-width: 10ch;
+    }
+
+    .subhead {
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 1.05rem;
+      max-width: 62ch;
+      margin-top: 18px;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 22px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 7px 11px;
+      border: 1px solid transparent;
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .badge.high { color: var(--danger); background: rgba(220, 38, 38, 0.11); }
+    .badge.open { color: var(--warning); background: rgba(245, 158, 11, 0.16); }
+    .badge.env { color: var(--ink); background: #eef2f7; border-color: #d5dde8; }
+    .badge.deploy { color: var(--accent-dark); background: rgba(15, 118, 110, 0.12); }
+
+    .hero-side {
+      display: grid;
+      gap: 14px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric {
+      border-radius: 18px;
+      padding: 16px;
+      border-left: 4px solid var(--accent);
+    }
+
+    .metric.warning { border-left-color: var(--warning); }
+    .metric.danger { border-left-color: var(--danger); }
+
+    .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-size: 0.74rem;
+      font-weight: 800;
+    }
+
+    .metric strong {
+      display: block;
+      margin: 9px 0 6px;
+      font-size: 1.85rem;
+      letter-spacing: 0;
+    }
+
+    .metric p {
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.92rem;
+    }
+
+    .panel {
+      border-radius: 22px;
+      padding: 20px;
+    }
+
+    .panel-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: baseline;
+      margin-bottom: 16px;
+    }
+
+    .panel-heading h2 {
+      font-size: 1.12rem;
+      letter-spacing: 0;
+    }
+
+    .panel-heading span {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .compare {
+      display: grid;
+      gap: 12px;
+    }
+
+    .compare-row {
+      display: grid;
+      grid-template-columns: 130px 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 0;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .compare-row:first-child { border-top: none; }
+
+    .bar {
+      height: 12px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--accent);
+    }
+
+    .bar.danger span { background: var(--danger); }
+    .bar.warning span { background: var(--warning); }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
+      gap: 24px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+    }
+
+    .timeline-item {
+      border-radius: 18px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 14px;
+      border-left: 4px solid var(--accent);
+    }
+
+    .timeline-item time {
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.88rem;
+    }
+
+    .timeline-item strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .timeline-item p {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .slack-alert {
+      border-radius: 18px;
+      padding: 18px;
+      background: #fbfbfd;
+    }
+
+    .slack-title {
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+
+    .slack-alert p {
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+
+    .slack-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .slack-field {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    .slack-field span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+    }
+
+    .cta {
+      margin-top: 24px;
+      padding: 18px 20px;
+      border-radius: 22px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #111827, var(--accent));
+      box-shadow: var(--shadow);
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .cta p {
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    .cta-code {
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.12);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-main {
+        min-height: auto;
+      }
+
+      h1 {
+        max-width: 12ch;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        width: min(100vw - 20px, 100%);
+        padding-top: 12px;
+      }
+
+      .topbar,
+      .cta {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .metric-grid,
+      .slack-fields {
+        grid-template-columns: 1fr;
+      }
+
+      .compare-row,
+      .timeline-item {
+        grid-template-columns: 1fr;
+      }
+
+      .cta-code {
+        width: 100%;
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span>WatchDog</span>
+      </div>
+      <div class="demo-pill">Static Vercel preview for a GTM AI demo</div>
+    </header>
+
+    <section class="hero" aria-label="Incident summary">
+      <div class="hero-main">
+        <div>
+          <div class="eyebrow">Deployment regression detected</div>
+          <h1>Release broke after deploy.</h1>
+          <p class="subhead">
+            WatchDog correlates deploy events with live metrics and log signatures, then turns the evidence
+            into a plain-English incident narrative your GTM, support, and engineering teams can understand fast.
+          </p>
+          <div class="badges">
+            <span class="badge high">High</span>
+            <span class="badge open">Open</span>
+            <span class="badge env">Demo</span>
+            <span class="badge deploy">Deploy v-gtm-demo</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-side">
+        <div class="metric-grid">
+          <article class="metric warning">
+            <div class="label">Detection delay</div>
+            <strong>5s</strong>
+            <p>Time between deploy and detected regression.</p>
+          </article>
+          <article class="metric danger">
+            <div class="label">Error delta</div>
+            <strong>+0.098</strong>
+            <p>Error rate shifted above the rolling baseline.</p>
+          </article>
+          <article class="metric warning">
+            <div class="label">Latency delta</div>
+            <strong>+142.8ms</strong>
+            <p>P95 latency moved sharply after release.</p>
+          </article>
+          <article class="metric">
+            <div class="label">Traffic</div>
+            <strong>405 req/s</strong>
+            <p>Request volume when the verdict was raised.</p>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-heading">
+            <h2>Dominant new error</h2>
+            <span>Seen 3 times</span>
+          </div>
+          <p><code>api: database timeout for user &lt;num&gt; request &lt;id&gt;</code></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>Before vs after</h2>
+          <span>Rolling baseline against detected state</span>
+        </div>
+        <div class="compare">
+          <div class="compare-row">
+            <strong>Error rate</strong>
+            <div>
+              <div class="label">Baseline 0.012</div>
+              <div class="bar"><span style="width: 12%"></span></div>
+            </div>
+            <div>
+              <div class="label">Detected 0.110</div>
+              <div class="bar danger"><span style="width: 92%"></span></div>
+            </div>
+          </div>
+          <div class="compare-row">
+            <strong>P95 latency</strong>
+            <div>
+              <div class="label">Baseline 117.2ms</div>
+              <div class="bar"><span style="width: 39%"></span></div>
+            </div>
+            <div>
+              <div class="label">Detected 260.0ms</div>
+              <div class="bar warning"><span style="width: 86%"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="slack-alert" aria-label="Slack alert preview">
+        <div class="slack-title">Slack alert preview</div>
+        <p><strong>v-gtm-demo</strong> in <code>demo</code> triggered <strong>error rate and latency shifted above baseline</strong>.</p>
+        <div class="slack-fields">
+          <div class="slack-field"><span>Detected after</span><strong>5s</strong></div>
+          <div class="slack-field"><span>Error signal</span><strong>New timeout</strong></div>
+          <div class="slack-field"><span>Error delta</span><strong>+0.098</strong></div>
+          <div class="slack-field"><span>Latency delta</span><strong>+142.8ms</strong></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel" style="margin-top: 24px;">
+      <div class="panel-heading">
+        <h2>Incident timeline</h2>
+        <span>Evidence stitched to the deploy</span>
+      </div>
+      <div class="timeline">
+        <article class="timeline-item">
+          <time>16:31:20 UTC</time>
+          <div>
+            <strong>Deploy started</strong>
+            <p>v-gtm-demo deployed to demo.</p>
+          </div>
+        </article>
+        <article class="timeline-item">
+          <time>16:31:23 UTC</time>
+          <div>
+            <strong>First dominant error</strong>
+            <p>Database timeout signature appeared after release.</p>
+          </div>
+        </article>
+        <article class="timeline-item">
+          <time>16:31:25 UTC</time>
+          <div>
+            <strong>Regression detected</strong>
+            <p>Error rate and latency shifted above baseline.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div>
+        <strong>Local product demo command</strong>
+        <p>Generate this incident locally, then launch the Rust dashboard.</p>
+      </div>
+      <div class="cta-code">cargo run -- demo</div>
+    </section>
+  </main>
+</body>
+</html>
