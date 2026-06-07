@@ -4,10 +4,10 @@ use crate::cli::{Cli, Command};
 use crate::config::WatchdogConfig;
 use crate::dashboard;
 use crate::engine::{EngineConfig, WatchdogEngine};
-use crate::model::{DeployEvent, MetricSample};
+use crate::model::{DeployEvent, LogEvent, MetricSample};
 use crate::storage;
 use crate::tail::LogTailer;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::{Duration, SecondsFormat, Utc};
 use clap::Parser;
 use std::fs::{self, File, OpenOptions};
@@ -47,6 +47,12 @@ pub async fn run() -> Result<()> {
             deploy,
             bad_deploy,
         } => simulate(state_dir, deploy, bad_deploy).await,
+        Command::Demo {
+            state_dir,
+            deploy,
+            environment,
+            healthy,
+        } => demo(state_dir, deploy, environment, healthy),
         Command::Benchmark {
             trials,
             monitoring_window_secs,
@@ -220,6 +226,98 @@ async fn simulate(state_dir: PathBuf, deploy: String, bad_deploy: bool) -> Resul
     Ok(())
 }
 
+fn demo(state_dir: PathBuf, deploy: String, environment: String, healthy: bool) -> Result<()> {
+    ensure_state_dir(&state_dir)?;
+    reset_demo_state(&state_dir)?;
+
+    let metrics_path = state_dir.join("metrics.jsonl");
+    let log_path = state_dir.join("app.log");
+    let deploys_path = state_dir.join("deploy-events.jsonl");
+    let start = Utc::now();
+    let mut engine = WatchdogEngine::new(120, 300);
+
+    for i in 0..30 {
+        let sample = MetricSample {
+            timestamp: start + Duration::seconds(i),
+            error_rate: 0.01 + ((i % 3) as f64 * 0.002),
+            p95_latency_ms: 110.0 + ((i % 4) as f64 * 5.0),
+            request_rate: 400.0,
+        };
+        append_jsonl(&metrics_path, &sample)?;
+        engine.ingest_metric(sample);
+    }
+
+    let deploy_event = DeployEvent {
+        timestamp: start + Duration::seconds(31),
+        deploy_id: deploy,
+        environment,
+    };
+    append_jsonl(&deploys_path, &deploy_event)?;
+    if !engine.mark_deploy(deploy_event.clone()) {
+        return Err(anyhow!("demo could not arm deploy correlation"));
+    }
+
+    let mut persisted = None;
+    for i in 32..45 {
+        let erroring = !healthy && i >= 34;
+        let degraded = !healthy && i >= 36;
+        let timestamp = start + Duration::seconds(i);
+        if erroring {
+            let message = "Database timeout for user 123 request 8f91ab22";
+            append_log_line(
+                &log_path,
+                &format!(
+                    "{} ERROR api {}",
+                    timestamp.to_rfc3339_opts(SecondsFormat::Secs, true),
+                    message
+                ),
+            )?;
+            engine.ingest_log(LogEvent {
+                timestamp,
+                level: "ERROR".to_string(),
+                service: "api".to_string(),
+                message: message.to_string(),
+            });
+        }
+
+        let sample = MetricSample {
+            timestamp,
+            error_rate: if degraded { 0.11 + ((i % 3) as f64 * 0.01) } else { 0.012 },
+            p95_latency_ms: if degraded { 260.0 + ((i % 2) as f64 * 30.0) } else { 120.0 },
+            request_rate: 405.0,
+        };
+        append_jsonl(&metrics_path, &sample)?;
+
+        if let Some(verdict) = engine.ingest_metric(sample) {
+            let message = alert::render(&verdict);
+            let incident = storage::persist_incident(&state_dir, &verdict, &message)?;
+            println!("{message}");
+            persisted = Some(incident);
+            break;
+        }
+    }
+
+    match persisted {
+        Some(incident) => {
+            println!("demo incident written: {}", incident.id);
+            println!(
+                "open the dashboard with `cargo run -- serve --state-dir {} --port 3001`",
+                state_dir.display()
+            );
+        }
+        None if healthy => {
+            println!("healthy demo data written; no incident was expected");
+            println!(
+                "open the dashboard with `cargo run -- serve --state-dir {} --port 3001`",
+                state_dir.display()
+            );
+        }
+        None => return Err(anyhow!("demo did not produce a regression incident")),
+    }
+
+    Ok(())
+}
+
 fn run_benchmark(trials: usize, monitoring_window_secs: u64) -> Result<()> {
     let summary = benchmark::run(trials, monitoring_window_secs);
     println!("watchdog benchmark summary");
@@ -242,6 +340,17 @@ fn ensure_state_dir(path: &Path) -> Result<()> {
 fn touch(path: &Path) -> Result<()> {
     if !path.exists() {
         File::create(path).with_context(|| format!("failed to create {}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn reset_demo_state(state_dir: &Path) -> Result<()> {
+    fs::write(state_dir.join("metrics.jsonl"), "")?;
+    fs::write(state_dir.join("app.log"), "")?;
+    fs::write(state_dir.join("deploy-events.jsonl"), "")?;
+    let incidents_path = state_dir.join("incidents");
+    if incidents_path.exists() {
+        fs::remove_dir_all(&incidents_path)?;
     }
     Ok(())
 }
@@ -343,5 +452,25 @@ mod tests {
         assert_eq!(cursor, 1);
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn demo_writes_persisted_bad_deploy_incident() {
+        let state_dir = temp_path("demo-state");
+
+        demo(
+            state_dir.clone(),
+            "v-demo".to_string(),
+            "demo".to_string(),
+            false,
+        )
+        .expect("demo should persist an incident");
+
+        let incidents = storage::list_incidents(&state_dir).expect("list incidents");
+        assert_eq!(incidents.len(), 1);
+        assert_eq!(incidents[0].verdict.deploy_id, "v-demo");
+        assert!(incidents[0].verdict.top_error_signature.is_some());
+
+        let _ = fs::remove_dir_all(state_dir);
     }
 }

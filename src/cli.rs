@@ -47,6 +47,16 @@ pub enum Command {
         #[arg(long, default_value_t = false)]
         bad_deploy: bool,
     },
+    Demo {
+        #[arg(long, default_value = ".watchdog-demo")]
+        state_dir: PathBuf,
+        #[arg(long, default_value = "v2.1.0")]
+        deploy: String,
+        #[arg(long, default_value = "demo")]
+        environment: String,
+        #[arg(long, default_value_t = false)]
+        healthy: bool,
+    },
     Benchmark {
         #[arg(long, default_value_t = 100)]
         trials: usize,

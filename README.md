@@ -48,7 +48,14 @@ flowchart TD
 
 ## Quick start
 
-Run a synthetic bad deploy demo:
+Create a ready-to-demo bad deploy incident:
+
+```bash
+cargo run -- demo
+cargo run -- serve --state-dir .watchdog-demo --port 3001
+```
+
+Run the streaming synthetic bad deploy demo:
 
 ```bash
 cargo run -- simulate --state-dir .WatchDog --deploy v1.4.2 --bad-deploy
