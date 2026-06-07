@@ -273,19 +273,75 @@ where
 {
     let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     let reader = BufReader::new(file);
+    let lines = reader.lines().collect::<std::io::Result<Vec<_>>>()?;
     let mut out = Vec::new();
 
-    for (index, line) in reader.lines().enumerate() {
-        if index < *cursor {
-            continue;
-        }
-        let line = line?;
+    if *cursor > lines.len() {
+        *cursor = 0;
+    }
+
+    for line in lines.iter().skip(*cursor) {
         if line.trim().is_empty() {
             continue;
         }
         out.push(serde_json::from_str(&line)?);
     }
 
-    *cursor += out.len();
+    *cursor = lines.len();
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::{Deserialize, Serialize};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    struct JsonlTestRecord {
+        value: usize,
+    }
+
+    fn temp_path(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("watchdog-{name}-{}-{nanos}.jsonl", std::process::id()))
+    }
+
+    #[test]
+    fn read_new_jsonl_counts_blank_lines_in_cursor() {
+        let path = temp_path("blank-lines");
+        fs::write(&path, "{\"value\":1}\n\n{\"value\":2}\n").expect("write jsonl");
+
+        let mut cursor = 0;
+        let records = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read records");
+        assert_eq!(records, vec![JsonlTestRecord { value: 1 }, JsonlTestRecord { value: 2 }]);
+        assert_eq!(cursor, 3);
+
+        append_jsonl(&path, &JsonlTestRecord { value: 3 }).expect("append record");
+        let records = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read appended record");
+        assert_eq!(records, vec![JsonlTestRecord { value: 3 }]);
+        assert_eq!(cursor, 4);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn read_new_jsonl_resets_cursor_after_file_truncation() {
+        let path = temp_path("truncated");
+        fs::write(&path, "{\"value\":1}\n{\"value\":2}\n").expect("write jsonl");
+
+        let mut cursor = 0;
+        let _ = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read initial records");
+        assert_eq!(cursor, 2);
+
+        fs::write(&path, "{\"value\":9}\n").expect("replace jsonl");
+        let records = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read replacement record");
+        assert_eq!(records, vec![JsonlTestRecord { value: 9 }]);
+        assert_eq!(cursor, 1);
+
+        let _ = fs::remove_file(path);
+    }
 }
