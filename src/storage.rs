@@ -3,6 +3,8 @@ use crate::model::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
+use rusqlite::{params, Connection};
+use std::env;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
@@ -25,6 +27,10 @@ pub fn persist_incident(state_dir: &Path, verdict: &RegressionVerdict, alert_tex
 }
 
 pub fn list_incidents(state_dir: &Path) -> Result<Vec<Incident>> {
+    if storage_backend().is_sqlite() {
+        return list_incidents_sqlite(state_dir);
+    }
+
     let dir = incidents_dir(state_dir);
     if !dir.exists() {
         return Ok(Vec::new());
@@ -47,6 +53,10 @@ pub fn list_incidents(state_dir: &Path) -> Result<Vec<Incident>> {
 }
 
 pub fn read_incident(state_dir: &Path, incident_id: &str) -> Result<Option<Incident>> {
+    if storage_backend().is_sqlite() {
+        return read_incident_sqlite(state_dir, incident_id);
+    }
+
     let path = incident_path(state_dir, incident_id);
     if !path.exists() {
         return Ok(None);
@@ -54,6 +64,13 @@ pub fn read_incident(state_dir: &Path, incident_id: &str) -> Result<Option<Incid
     let file = File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
     let incident = serde_json::from_reader(file)?;
     Ok(Some(incident))
+}
+
+pub fn storage_backend_label() -> &'static str {
+    match storage_backend() {
+        StorageBackend::Sqlite => "sqlite",
+        StorageBackend::JsonFiles => "json-files",
+    }
 }
 
 pub fn update_incident_explanation(state_dir: &Path, incident_id: &str, explanation: &str) -> Result<Option<Incident>> {
@@ -90,6 +107,10 @@ pub fn update_incident_notes(state_dir: &Path, incident_id: &str, notes: &str) -
 }
 
 fn write_incident(state_dir: &Path, incident: &Incident) -> Result<()> {
+    if storage_backend().is_sqlite() {
+        return write_incident_sqlite(state_dir, incident);
+    }
+
     let incidents_dir = incidents_dir(state_dir);
     fs::create_dir_all(&incidents_dir)
         .with_context(|| format!("failed to create incidents dir {}", incidents_dir.display()))?;
@@ -97,6 +118,140 @@ fn write_incident(state_dir: &Path, incident: &Incident) -> Result<()> {
     let file = File::create(&path).with_context(|| format!("failed to create {}", path.display()))?;
     serde_json::to_writer_pretty(file, incident)?;
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StorageBackend {
+    JsonFiles,
+    Sqlite,
+}
+
+impl StorageBackend {
+    fn is_sqlite(self) -> bool {
+        matches!(self, StorageBackend::Sqlite)
+    }
+}
+
+fn storage_backend() -> StorageBackend {
+    match env::var("WATCHDOG_STORAGE") {
+        Ok(value) if value.eq_ignore_ascii_case("sqlite") => StorageBackend::Sqlite,
+        Ok(value) if value.eq_ignore_ascii_case("db") => StorageBackend::Sqlite,
+        Ok(value) if value.eq_ignore_ascii_case("database") => StorageBackend::Sqlite,
+        _ => StorageBackend::JsonFiles,
+    }
+}
+
+fn sqlite_path(state_dir: &Path) -> PathBuf {
+    if let Ok(value) = env::var("WATCHDOG_DATABASE_URL") {
+        if let Some(path) = value.strip_prefix("sqlite:") {
+            return PathBuf::from(path);
+        }
+        if let Some(path) = value.strip_prefix("sqlite://") {
+            return PathBuf::from(path);
+        }
+        return PathBuf::from(value);
+    }
+
+    state_dir.join("watchdog.sqlite")
+}
+
+fn sqlite_connection(state_dir: &Path) -> Result<Connection> {
+    fs::create_dir_all(state_dir)
+        .with_context(|| format!("failed to create state dir {}", state_dir.display()))?;
+
+    let path = sqlite_path(state_dir);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create sqlite dir {}", parent.display()))?;
+    }
+
+    let connection = Connection::open(&path)
+        .with_context(|| format!("failed to open sqlite database {}", path.display()))?;
+    connection.execute_batch(
+        r#"
+        PRAGMA journal_mode = WAL;
+        PRAGMA foreign_keys = ON;
+
+        CREATE TABLE IF NOT EXISTS incidents (
+            id TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            status TEXT NOT NULL,
+            deploy_id TEXT NOT NULL,
+            environment TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            incident_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_incidents_created_at ON incidents(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+        CREATE INDEX IF NOT EXISTS idx_incidents_deploy_id ON incidents(deploy_id);
+        "#,
+    )?;
+    Ok(connection)
+}
+
+fn write_incident_sqlite(state_dir: &Path, incident: &Incident) -> Result<()> {
+    let connection = sqlite_connection(state_dir)?;
+    let incident_json = serde_json::to_string(incident)?;
+    connection.execute(
+        r#"
+        INSERT INTO incidents (
+            id, created_at, severity, status, deploy_id, environment, summary, incident_json, updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        ON CONFLICT(id) DO UPDATE SET
+            created_at = excluded.created_at,
+            severity = excluded.severity,
+            status = excluded.status,
+            deploy_id = excluded.deploy_id,
+            environment = excluded.environment,
+            summary = excluded.summary,
+            incident_json = excluded.incident_json,
+            updated_at = excluded.updated_at
+        "#,
+        params![
+            &incident.id,
+            incident.created_at.to_rfc3339(),
+            &incident.severity,
+            &incident.status,
+            &incident.verdict.deploy_id,
+            &incident.verdict.environment,
+            &incident.summary,
+            incident_json,
+            Utc::now().to_rfc3339(),
+        ],
+    )?;
+    Ok(())
+}
+
+fn list_incidents_sqlite(state_dir: &Path) -> Result<Vec<Incident>> {
+    let connection = sqlite_connection(state_dir)?;
+    let mut statement = connection.prepare(
+        "SELECT incident_json FROM incidents ORDER BY created_at DESC",
+    )?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+
+    let mut incidents = Vec::new();
+    for row in rows {
+        let incident_json = row?;
+        incidents.push(serde_json::from_str::<Incident>(&incident_json)?);
+    }
+    Ok(incidents)
+}
+
+fn read_incident_sqlite(state_dir: &Path, incident_id: &str) -> Result<Option<Incident>> {
+    let connection = sqlite_connection(state_dir)?;
+    let mut statement = connection.prepare(
+        "SELECT incident_json FROM incidents WHERE id = ?1 LIMIT 1",
+    )?;
+    let mut rows = statement.query(params![incident_id])?;
+    let Some(row) = rows.next()? else {
+        return Ok(None);
+    };
+    let incident_json: String = row.get(0)?;
+    Ok(Some(serde_json::from_str(&incident_json)?))
 }
 
 fn severity_for(verdict: &RegressionVerdict) -> String {

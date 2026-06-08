@@ -1,12 +1,17 @@
+use crate::alert;
+use crate::engine::WatchdogEngine;
 use crate::export;
 use crate::llm;
-use crate::model::normalize_incident_status;
+use crate::model::{
+    normalize_incident_status, DeployEvent, Incident, LogEvent, MetricSample,
+};
 use crate::storage;
 use axum::extract::{Path, State};
 use axum::http::{header, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -21,6 +26,27 @@ struct AppState {
 #[derive(Debug, Serialize)]
 struct ExplainResponse {
     explanation: String,
+}
+
+#[derive(Debug, Serialize)]
+struct HealthResponse {
+    status: &'static str,
+    incident_count: usize,
+    storage_backend: &'static str,
+    state_dir: String,
+    explainer: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DemoScenarioRequest {
+    scenario: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DemoScenarioResponse {
+    scenario: String,
+    incident_id: String,
+    incident: Incident,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,7 +66,9 @@ pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Resul
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/healthz", get(healthz))
         .route("/api/incidents", get(list_incidents))
+        .route("/api/demo/scenarios", post(create_demo_scenario))
         .route("/api/incidents/{id}", get(get_incident))
         .route("/api/incidents/{id}/status", post(update_incident_status))
         .route("/api/incidents/{id}/notes", post(update_incident_notes))
@@ -62,6 +90,20 @@ async fn index() -> Html<&'static str> {
     Html(INDEX_HTML)
 }
 
+async fn healthz(State(state): State<AppState>) -> impl IntoResponse {
+    let incident_count = storage::list_incidents(&state.state_dir)
+        .map(|incidents| incidents.len())
+        .unwrap_or_default();
+
+    Json(HealthResponse {
+        status: "ok",
+        incident_count,
+        storage_backend: storage::storage_backend_label(),
+        state_dir: state.state_dir.display().to_string(),
+        explainer: std::env::var("WATCHDOG_EXPLAINER").unwrap_or_else(|_| "auto".to_string()),
+    })
+}
+
 async fn list_incidents(State(state): State<AppState>) -> impl IntoResponse {
     match storage::list_incidents(&state.state_dir) {
         Ok(incidents) => Json(
@@ -70,6 +112,25 @@ async fn list_incidents(State(state): State<AppState>) -> impl IntoResponse {
                 .map(|incident| incident.list_item())
                 .collect::<Vec<_>>(),
         )
+        .into_response(),
+        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    }
+}
+
+async fn create_demo_scenario(
+    State(state): State<AppState>,
+    Json(payload): Json<DemoScenarioRequest>,
+) -> Response {
+    let scenario = payload
+        .scenario
+        .unwrap_or_else(|| "checkout-timeout".to_string());
+
+    match run_demo_scenario(&state.state_dir, &scenario) {
+        Ok(incident) => Json(DemoScenarioResponse {
+            scenario,
+            incident_id: incident.id.clone(),
+            incident,
+        })
         .into_response(),
         Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     }
@@ -222,6 +283,74 @@ async fn generate_incident_explanation(
     }
 }
 
+fn run_demo_scenario(state_dir: &std::path::Path, scenario: &str) -> anyhow::Result<Incident> {
+    let mut engine = WatchdogEngine::new(120, 300);
+    let now = Utc::now();
+    let deploy_id = format!("demo-{}", now.timestamp_millis());
+    let environment = match scenario {
+        "payments-latency" => "payments",
+        _ => "checkout",
+    }
+    .to_string();
+
+    for i in 0..30 {
+        engine.ingest_metric(MetricSample {
+            timestamp: now + Duration::seconds(i),
+            error_rate: 0.010 + ((i % 3) as f64 * 0.002),
+            p95_latency_ms: 112.0 + ((i % 4) as f64 * 4.0),
+            request_rate: 390.0 + ((i % 5) as f64 * 6.0),
+        });
+    }
+
+    let deploy = DeployEvent {
+        timestamp: now + Duration::seconds(31),
+        deploy_id,
+        environment,
+    };
+
+    if !engine.mark_deploy(deploy.clone()) {
+        anyhow::bail!("demo scenario could not arm deploy correlation");
+    }
+
+    for i in 32..48 {
+        let timestamp = now + Duration::seconds(i);
+        let degraded = i >= 35;
+        let (error_rate, latency, signature) = match scenario {
+            "payments-latency" => (
+                if degraded { 0.045 + ((i % 2) as f64 * 0.006) } else { 0.012 },
+                if degraded { 345.0 + ((i % 3) as f64 * 24.0) } else { 124.0 },
+                "Payment provider timeout while authorizing card 4242 request 8f91ab22",
+            ),
+            _ => (
+                if degraded { 0.108 + ((i % 3) as f64 * 0.01) } else { 0.013 },
+                if degraded { 265.0 + ((i % 2) as f64 * 28.0) } else { 121.0 },
+                "Database timeout while loading checkout session user 123 request 8f91ab22",
+            ),
+        };
+
+        if degraded {
+            engine.ingest_log(LogEvent {
+                timestamp,
+                level: "ERROR".to_string(),
+                service: "api".to_string(),
+                message: signature.to_string(),
+            });
+        }
+
+        if let Some(verdict) = engine.ingest_metric(MetricSample {
+            timestamp,
+            error_rate,
+            p95_latency_ms: latency,
+            request_rate: 405.0,
+        }) {
+            let message = alert::render(&verdict);
+            return storage::persist_incident(state_dir, &verdict, &message);
+        }
+    }
+
+    anyhow::bail!("demo scenario did not produce a regression incident")
+}
+
 const INDEX_HTML: &str = r#"<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -230,57 +359,57 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
   <title>watchdog dashboard</title>
   <style>
     :root {
-      --bg: #f7fbff;
+      --bg: #f3f5fb;
       --bg-strong: #ffffff;
       --surface: rgba(255, 255, 255, 0.94);
       --surface-strong: rgba(255, 255, 255, 0.99);
-      --surface-tint: rgba(237, 245, 252, 0.82);
-      --ink: #111827;
-      --muted: #3f4b5f;
-      --line: rgba(94, 116, 145, 0.3);
-      --line-strong: rgba(58, 75, 102, 0.42);
-      --accent: #087f73;
-      --accent-strong: #075f57;
-      --accent-soft: rgba(8, 127, 115, 0.12);
-      --accent-glow: rgba(8, 127, 115, 0.14);
-      --danger: #b91c1c;
-      --danger-soft: rgba(220, 38, 38, 0.12);
-      --warning: #b45309;
-      --warning-soft: rgba(234, 88, 12, 0.12);
+      --surface-tint: rgba(239, 244, 255, 0.84);
+      --ink: #162033;
+      --muted: #526071;
+      --line: rgba(92, 107, 132, 0.3);
+      --line-strong: rgba(45, 58, 82, 0.38);
+      --accent: #2f5bea;
+      --accent-strong: #2446b8;
+      --accent-soft: rgba(47, 91, 234, 0.12);
+      --accent-glow: rgba(47, 91, 234, 0.14);
+      --danger: #c2412f;
+      --danger-soft: rgba(194, 65, 47, 0.13);
+      --warning: #b7791f;
+      --warning-soft: rgba(217, 119, 6, 0.14);
       --shadow-lg: 0 26px 70px rgba(17, 24, 39, 0.1);
       --shadow-md: 0 14px 34px rgba(17, 24, 39, 0.08);
       --shadow-sm: 0 8px 20px rgba(17, 24, 39, 0.06);
-      --focus: #0b7f74;
-      --radius-xl: 30px;
-      --radius-lg: 24px;
-      --radius-md: 18px;
-      --radius-sm: 14px;
+      --focus: #2f5bea;
+      --radius-xl: 14px;
+      --radius-lg: 12px;
+      --radius-md: 10px;
+      --radius-sm: 8px;
       --theme-icon: "🌙";
     }
 
     html[data-theme="dark"] {
       color-scheme: dark;
-      --bg: #0d141a;
-      --bg-strong: #121c24;
-      --surface: rgba(17, 28, 36, 0.78);
-      --surface-strong: rgba(24, 37, 48, 0.96);
-      --surface-tint: rgba(18, 30, 39, 0.82);
-      --ink: #eef4f7;
-      --muted: #9ba9b6;
-      --line: rgba(122, 147, 168, 0.22);
-      --line-strong: rgba(140, 168, 191, 0.34);
-      --accent: #54d0c3;
-      --accent-strong: #8be7de;
-      --accent-soft: rgba(84, 208, 195, 0.14);
-      --accent-glow: rgba(84, 208, 195, 0.2);
-      --danger: #ff8f95;
-      --danger-soft: rgba(255, 143, 149, 0.13);
-      --warning: #ffbb7a;
-      --warning-soft: rgba(255, 187, 122, 0.12);
+      --bg: #101622;
+      --bg-strong: #151d2b;
+      --surface: rgba(22, 31, 46, 0.82);
+      --surface-strong: rgba(28, 39, 58, 0.96);
+      --surface-tint: rgba(25, 38, 63, 0.82);
+      --ink: #f4f7fb;
+      --muted: #a4afc0;
+      --line: rgba(134, 151, 179, 0.22);
+      --line-strong: rgba(151, 169, 198, 0.34);
+      --accent: #8da2ff;
+      --accent-strong: #c4d0ff;
+      --accent-soft: rgba(141, 162, 255, 0.15);
+      --accent-glow: rgba(141, 162, 255, 0.2);
+      --danger: #ff9a86;
+      --danger-soft: rgba(255, 154, 134, 0.13);
+      --warning: #f2c36b;
+      --warning-soft: rgba(242, 195, 107, 0.12);
       --shadow-lg: 0 30px 90px rgba(0, 0, 0, 0.42);
       --shadow-md: 0 16px 44px rgba(0, 0, 0, 0.28);
       --shadow-sm: 0 10px 26px rgba(0, 0, 0, 0.2);
-      --focus: #7ae8dc;
+      --focus: #aebcff;
       --theme-icon: "☀";
     }
 
@@ -290,11 +419,11 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: Georgia, "Times New Roman", serif;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 0% 0%, rgba(8, 127, 115, 0.08), transparent 25%),
-        radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.06), transparent 24%),
+        linear-gradient(120deg, rgba(47, 91, 234, 0.08), transparent 34%),
+        linear-gradient(145deg, transparent 0%, rgba(183, 121, 31, 0.06) 78%, rgba(183, 121, 31, 0.1) 100%),
         linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
       overflow-x: hidden;
       transition: background 220ms ease, color 220ms ease;
@@ -302,9 +431,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     html[data-theme="dark"] body {
       background:
-        radial-gradient(circle at 0% 0%, rgba(84, 208, 195, 0.16), transparent 26%),
-        radial-gradient(circle at 100% 0%, rgba(255, 143, 149, 0.08), transparent 22%),
-        linear-gradient(180deg, #101820 0%, var(--bg) 100%);
+        linear-gradient(120deg, rgba(141, 162, 255, 0.12), transparent 34%),
+        linear-gradient(145deg, transparent 0%, rgba(242, 195, 107, 0.07) 78%, rgba(242, 195, 107, 0.12) 100%),
+        linear-gradient(180deg, #0d1320 0%, var(--bg) 100%);
     }
 
     body::before {
@@ -342,7 +471,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       width: min(1360px, calc(100vw - 32px));
       margin: 24px auto;
       display: grid;
-      grid-template-columns: 380px minmax(0, 1fr);
+      grid-template-columns: 360px minmax(0, 1fr);
       gap: 20px;
       position: relative;
       z-index: 1;
@@ -416,8 +545,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       letter-spacing: 0;
     }
 
-    h1 { font-size: clamp(2.5rem, 3vw, 3.25rem); }
-    h2 { font-size: clamp(1.8rem, 2.4vw, 2.45rem); }
+    h1 { font-size: clamp(2rem, 2.5vw, 2.65rem); }
+    h2 { font-size: clamp(1.45rem, 2vw, 2.1rem); }
     h3 { font-size: 1.05rem; }
     h4 { font-size: 1rem; }
 
@@ -436,6 +565,57 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       max-width: 28ch;
     }
 
+    .product-steps {
+      display: grid;
+      gap: 10px;
+    }
+
+    .product-step {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .step-index {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 800;
+      font-size: 0.8rem;
+    }
+
+    .product-step strong {
+      display: block;
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+
+    .scenario-card {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-lg);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .scenario-actions {
+      display: grid;
+      gap: 8px;
+    }
+
     .sidebar-top {
       display: grid;
       gap: 12px;
@@ -447,7 +627,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       align-items: stretch;
       gap: 12px;
       padding: 12px;
-      border-radius: 14px;
+      border-radius: var(--radius-md);
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.94);
       color: var(--ink);
@@ -492,7 +672,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       height: 8px;
       border-radius: 999px;
       background: var(--accent);
-      box-shadow: 0 0 0 0 rgba(15, 118, 110, 0.24);
+      box-shadow: 0 0 0 0 rgba(47, 91, 234, 0.24);
       animation: pulse 2.2s infinite;
     }
 
@@ -547,7 +727,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       gap: 14px;
       padding: 14px 16px;
       border-radius: var(--radius-md);
-      background: linear-gradient(135deg, #111827, #087f73);
+      background: linear-gradient(135deg, #172033, #2f5bea);
       color: white;
       box-shadow: var(--shadow-md);
       overflow: hidden;
@@ -565,7 +745,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     html[data-theme="dark"] .status-banner {
-      background: linear-gradient(135deg, rgba(12, 25, 33, 0.96), rgba(15, 118, 110, 0.88));
+      background: linear-gradient(135deg, rgba(16, 23, 36, 0.96), rgba(47, 91, 234, 0.82));
     }
 
     .status-banner strong {
@@ -578,8 +758,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       width: 12px;
       height: 12px;
       border-radius: 999px;
-      background: #7cf2c2;
-      box-shadow: 0 0 0 0 rgba(124, 242, 194, 0.45);
+      background: #f2c36b;
+      box-shadow: 0 0 0 0 rgba(242, 195, 107, 0.45);
       animation: pulse 2s infinite;
       flex: none;
     }
@@ -605,7 +785,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .control-input {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: var(--radius-md);
       padding: 12px 14px;
       background: rgba(255, 255, 255, 0.94);
       color: var(--ink);
@@ -680,8 +860,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .signal-card strong {
       display: block;
       margin-top: 10px;
-      font-size: 1.65rem;
+      font-size: clamp(1.15rem, 1.45vw, 1.55rem);
       letter-spacing: 0;
+      overflow-wrap: anywhere;
     }
 
     .label {
@@ -704,15 +885,15 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       right: 0;
       bottom: 0;
       height: 4px;
-      background: linear-gradient(90deg, var(--accent), rgba(15, 118, 110, 0.22));
+      background: linear-gradient(90deg, var(--accent), rgba(47, 91, 234, 0.22));
     }
 
     .signal-card.warning::after {
-      background: linear-gradient(90deg, #ea580c, rgba(234, 88, 12, 0.2));
+      background: linear-gradient(90deg, #d97706, rgba(217, 119, 6, 0.2));
     }
 
     .signal-card.danger::after {
-      background: linear-gradient(90deg, #dc2626, rgba(220, 38, 38, 0.2));
+      background: linear-gradient(90deg, #c2412f, rgba(194, 65, 47, 0.2));
     }
 
     html[data-theme="dark"] .signal-card {
@@ -742,9 +923,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .incident-card:hover,
     .incident-card.active {
       transform: translateY(-2px);
-      border-color: rgba(15, 118, 110, 0.38);
+      border-color: rgba(47, 91, 234, 0.38);
       background: linear-gradient(180deg, #eaf8f6, #ffffff);
-      box-shadow: 0 18px 32px rgba(15, 118, 110, 0.12);
+      box-shadow: 0 18px 32px rgba(47, 91, 234, 0.12);
       border-left-color: var(--accent);
     }
 
@@ -787,9 +968,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .badge.high { background: var(--danger-soft); color: var(--danger); }
     .badge.medium { background: var(--accent-soft); color: var(--accent-strong); }
     .badge.environment { background: rgba(17, 24, 39, 0.07); color: var(--ink); border-color: rgba(17, 24, 39, 0.08); }
-    .badge.subtle { background: rgba(15, 118, 110, 0.08); color: var(--accent-strong); }
-    .badge.open { background: rgba(245, 158, 11, 0.16); color: #b45309; }
-    .badge.resolved { background: rgba(34, 197, 94, 0.16); color: #15803d; }
+    .badge.subtle { background: rgba(47, 91, 234, 0.09); color: var(--accent-strong); }
+    .badge.open { background: rgba(217, 119, 6, 0.15); color: #9a5d11; }
+    .badge.resolved { background: rgba(44, 126, 92, 0.14); color: #2c7e5c; }
 
     html[data-theme="dark"] .badge.environment {
       background: rgba(255, 255, 255, 0.06);
@@ -833,7 +1014,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .refresh-link {
       appearance: none;
       border: 1px solid transparent;
-      border-radius: 16px;
+      border-radius: var(--radius-sm);
       padding: 12px 16px;
       cursor: pointer;
       font-weight: 600;
@@ -854,7 +1035,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     html[data-theme="dark"] .button-primary {
-      background: linear-gradient(135deg, #dff5f3, #78d6ca);
+      background: linear-gradient(135deg, #edf1ff, #aebcff);
       color: #0f1a22;
     }
 
@@ -950,7 +1131,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .compare-chart-area {
-      fill: rgba(15, 118, 110, 0.12);
+      fill: rgba(47, 91, 234, 0.12);
     }
 
     .compare-chart-line {
@@ -966,7 +1147,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .compare-card.warning .compare-chart-line {
-      stroke: #ea580c;
+      stroke: #d97706;
     }
 
     .compare-chart-dot {
@@ -976,7 +1157,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .compare-card.warning .compare-chart-dot {
-      stroke: #ea580c;
+      stroke: #d97706;
     }
 
     .compare-chart-label {
@@ -1035,7 +1216,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       width: 100%;
       min-height: 120px;
       border: 1px solid var(--line);
-      border-radius: 16px;
+      border-radius: var(--radius-sm);
       padding: 14px;
       background: rgba(255, 255, 255, 0.95);
       color: var(--ink);
@@ -1078,7 +1259,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       bottom: 16px;
       width: 4px;
       border-radius: 999px;
-      background: linear-gradient(180deg, var(--accent), rgba(15, 118, 110, 0.08));
+      background: linear-gradient(180deg, var(--accent), rgba(47, 91, 234, 0.08));
     }
 
     .timeline-time {
@@ -1138,8 +1319,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .skeleton.panel-block { min-height: 210px; }
 
     .reveal {
-      opacity: 0;
-      transform: translateY(24px) scale(0.985);
+      opacity: 1;
+      transform: translateY(10px) scale(0.995);
       transition: opacity 560ms ease, transform 560ms cubic-bezier(.2,.7,.2,1);
       will-change: transform, opacity;
     }
@@ -1152,21 +1333,6 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     .reveal-delay-1 { transition-delay: 80ms; }
     .reveal-delay-2 { transition-delay: 140ms; }
     .reveal-delay-3 { transition-delay: 200ms; }
-
-    .float-accent {
-      position: absolute;
-      width: 240px;
-      height: 240px;
-      border-radius: 999px;
-      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 68%);
-      filter: blur(10px);
-      pointer-events: none;
-      z-index: 0;
-      animation: drift 12s ease-in-out infinite;
-    }
-
-    .float-accent.one { top: -60px; right: 8%; }
-    .float-accent.two { bottom: 18%; left: -60px; animation-delay: -4s; }
 
     .toast-stack {
       position: fixed;
@@ -1181,7 +1347,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     .toast {
       pointer-events: auto;
-      border-radius: 20px;
+      border-radius: var(--radius-md);
       border: 1px solid var(--line);
       background: linear-gradient(180deg, rgba(19, 31, 39, 0.96), rgba(13, 22, 29, 0.92));
       color: #f8fbfc;
@@ -1251,14 +1417,9 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(124, 242, 194, 0.45); }
-      70% { box-shadow: 0 0 0 12px rgba(124, 242, 194, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(124, 242, 194, 0); }
-    }
-
-    @keyframes drift {
-      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-      50% { transform: translate3d(0, -12px, 0) scale(1.04); }
+      0% { box-shadow: 0 0 0 0 rgba(242, 195, 107, 0.45); }
+      70% { box-shadow: 0 0 0 12px rgba(242, 195, 107, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(242, 195, 107, 0); }
     }
 
     @keyframes sweep {
@@ -1326,8 +1487,6 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <div class="float-accent one" aria-hidden="true"></div>
-  <div class="float-accent two" aria-hidden="true"></div>
   <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
   <div class="shell">
     <aside class="panel sidebar reveal" aria-label="Incident list">
@@ -1339,8 +1498,35 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           </div>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode"></button>
         </div>
-        <p class="sidebar-copy">A Rust incident console that turns deploy regressions into readable evidence. It correlates releases, metric shifts, and new log signatures so developers can understand what changed fast.</p>
+        <p class="sidebar-copy">A release regression console for engineering teams. WatchDog correlates deploy events, service metrics, and new error signatures, then saves the evidence as triage-ready incidents.</p>
       </div>
+
+      <section class="scenario-card reveal reveal-delay-1" aria-label="Demo scenario">
+        <div>
+          <div class="label">Hosted workflow</div>
+          <strong>Generate a deploy regression</strong>
+          <p class="meta" style="margin-top: 6px;">Runs a backend scenario through the Rust detector and saves a new incident.</p>
+        </div>
+        <div class="scenario-actions">
+          <button id="demo-checkout" class="button button-primary" type="button">Run Checkout Scenario</button>
+          <button id="demo-payments" class="button button-secondary" type="button">Run Payments Scenario</button>
+        </div>
+      </section>
+
+      <section class="product-steps reveal reveal-delay-1" aria-label="Product workflow">
+        <article class="product-step">
+          <span class="step-index">1</span>
+          <div><strong>Trigger</strong><p class="meta">A deploy event opens a monitoring window.</p></div>
+        </article>
+        <article class="product-step">
+          <span class="step-index">2</span>
+          <div><strong>Detect</strong><p class="meta">Metrics and logs are compared against the pre-deploy baseline.</p></div>
+        </article>
+        <article class="product-step">
+          <span class="step-index">3</span>
+          <div><strong>Triage</strong><p class="meta">Incidents, notes, explanations, and exports are persisted.</p></div>
+        </article>
+      </section>
 
       <section class="sync-bar reveal reveal-delay-1" aria-label="Dashboard sync status">
         <div id="sync-state" class="sync-state">Auto-refresh on</div>
@@ -1396,7 +1582,6 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       </section>
 
       <div id="incident-list" class="incident-list reveal reveal-delay-3" role="list" aria-label="Incident list"></div>
-      <p class="meta reveal reveal-delay-3" style="margin-top: 8px;">Shortcuts: <code>/</code> search, <code>j</code>/<code>k</code> move, <code>e</code> explain, <code>Shift+R</code> regenerate, <code>Ctrl/Cmd+S</code> save notes.</p>
     </aside>
 
     <main class="panel detail" id="detail-panel" aria-live="polite"></main>
@@ -1457,6 +1642,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       bindThemeToggle();
       bindNotificationToggle();
       bindNotificationReset();
+      bindDemoScenarios();
       applyUrlState();
       bindFilters();
       bindKeyboardShortcuts();
@@ -1525,8 +1711,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function applySavedTheme() {
       const savedTheme = readStorage(THEME_KEY);
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = savedTheme || (systemDark ? 'dark' : 'light');
+      const theme = savedTheme || 'light';
       document.documentElement.setAttribute('data-theme', theme);
     }
 
@@ -1688,6 +1873,51 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         clearNotifiedIncidentIds();
         showToast('Remembered incident alerts cleared. New incidents can notify again.');
       });
+    }
+
+    function bindDemoScenarios() {
+      const checkout = document.getElementById('demo-checkout');
+      const payments = document.getElementById('demo-payments');
+      checkout?.addEventListener('click', () => createDemoScenario('checkout-timeout'));
+      payments?.addEventListener('click', () => createDemoScenario('payments-latency'));
+    }
+
+    async function createDemoScenario(scenario) {
+      const buttons = [document.getElementById('demo-checkout'), document.getElementById('demo-payments')].filter(Boolean);
+      buttons.forEach((button) => {
+        button.disabled = true;
+        button.dataset.previousLabel = button.textContent;
+      });
+      const activeButton = scenario === 'payments-latency' ? document.getElementById('demo-payments') : document.getElementById('demo-checkout');
+      if (activeButton) {
+        activeButton.textContent = 'Generating...';
+      }
+
+      try {
+        const response = await fetch('/api/demo/scenarios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scenario }),
+        });
+        const body = await response.text();
+        if (!response.ok) {
+          throw new Error(body);
+        }
+        const result = JSON.parse(body);
+        activeIncidentId = result.incident_id;
+        knownIncidentIds.delete(result.incident_id);
+        showToast('Backend scenario generated and persisted a new incident.', 'warning', result.incident);
+        await loadIncidents({ silent: true });
+        await selectIncident(result.incident_id, false, true);
+      } catch (error) {
+        showToast(`Could not generate scenario. ${error.message || String(error)}`, 'warning');
+      } finally {
+        buttons.forEach((button) => {
+          button.disabled = false;
+          button.textContent = button.dataset.previousLabel || button.textContent;
+          delete button.dataset.previousLabel;
+        });
+      }
     }
 
     function notifyOnNewIncidents(previousIncidentIds, nextIncidents) {
@@ -2103,7 +2333,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     function renderEmptyDetail() {
       document.getElementById('detail-panel').innerHTML = `
         <div class="empty reveal in-view">
-          No incidents yet. Run the daemon and trigger a bad deploy simulation to populate the dashboard.
+          No incidents yet. Run a hosted scenario from the sidebar or connect the daemon to metrics and deploy events to create the first saved regression record.
         </div>
       `;
     }
@@ -2167,7 +2397,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
               ${renderBadge('subtle', `deploy ${escapeHtml(verdict.deploy_id)}`)}
             </div>
             <h2>${escapeHtml(incident.summary)}</h2>
-            <p class="subhead">Watchdog flagged this release ${verdict.seconds_after_deploy}s after deploy. The detector saw a statistically meaningful shift in service health and preserved the strongest supporting evidence.</p>
+            <p class="subhead">WatchDog flagged this release ${verdict.seconds_after_deploy}s after deploy. The backend detector compared post-deploy behavior against the saved baseline and persisted the strongest evidence for triage.</p>
           </div>
           <div class="hero-actions">
             <button class="button button-primary" ${loading ? 'disabled' : ''} onclick="explainIncident('${incident.id}')">${loading ? 'Explaining…' : 'Explain Incident'}</button>

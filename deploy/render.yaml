@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: watchdog-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: WATCHDOG_EXPLAINER
+        value: local
+      - key: WATCHDOG_STORAGE
+        value: sqlite
+      - key: WATCHDOG_STATE_DIR
+        value: /data/watchdog
+      - key: WATCHDOG_DATABASE_URL
+        value: /data/watchdog/watchdog.sqlite
+      - key: WATCHDOG_DEMO_DEPLOY
+        value: v3.2.1
+      - key: WATCHDOG_DEMO_ENVIRONMENT
+        value: demo
+    disk:
+      name: watchdog-data
+      mountPath: /data
+      sizeGB: 1

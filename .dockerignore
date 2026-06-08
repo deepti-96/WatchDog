@@ -1,0 +1,7 @@
+.git
+.watchdog
+.watchdog-demo
+target
+venv
+vercel-demo/.vercel
+demo-video
