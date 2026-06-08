@@ -3,7 +3,10 @@ use crate::model::{
 };
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
+use reqwest::blocking::Client;
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -27,8 +30,10 @@ pub fn persist_incident(state_dir: &Path, verdict: &RegressionVerdict, alert_tex
 }
 
 pub fn list_incidents(state_dir: &Path) -> Result<Vec<Incident>> {
-    if storage_backend().is_sqlite() {
-        return list_incidents_sqlite(state_dir);
+    match storage_backend() {
+        StorageBackend::Sqlite => return list_incidents_sqlite(state_dir),
+        StorageBackend::Supabase => return list_incidents_supabase(),
+        StorageBackend::JsonFiles => {}
     }
 
     let dir = incidents_dir(state_dir);
@@ -53,8 +58,10 @@ pub fn list_incidents(state_dir: &Path) -> Result<Vec<Incident>> {
 }
 
 pub fn read_incident(state_dir: &Path, incident_id: &str) -> Result<Option<Incident>> {
-    if storage_backend().is_sqlite() {
-        return read_incident_sqlite(state_dir, incident_id);
+    match storage_backend() {
+        StorageBackend::Sqlite => return read_incident_sqlite(state_dir, incident_id),
+        StorageBackend::Supabase => return read_incident_supabase(incident_id),
+        StorageBackend::JsonFiles => {}
     }
 
     let path = incident_path(state_dir, incident_id);
@@ -69,6 +76,7 @@ pub fn read_incident(state_dir: &Path, incident_id: &str) -> Result<Option<Incid
 pub fn storage_backend_label() -> &'static str {
     match storage_backend() {
         StorageBackend::Sqlite => "sqlite",
+        StorageBackend::Supabase => "supabase",
         StorageBackend::JsonFiles => "json-files",
     }
 }
@@ -107,8 +115,10 @@ pub fn update_incident_notes(state_dir: &Path, incident_id: &str, notes: &str) -
 }
 
 fn write_incident(state_dir: &Path, incident: &Incident) -> Result<()> {
-    if storage_backend().is_sqlite() {
-        return write_incident_sqlite(state_dir, incident);
+    match storage_backend() {
+        StorageBackend::Sqlite => return write_incident_sqlite(state_dir, incident),
+        StorageBackend::Supabase => return write_incident_supabase(incident),
+        StorageBackend::JsonFiles => {}
     }
 
     let incidents_dir = incidents_dir(state_dir);
@@ -124,17 +134,15 @@ fn write_incident(state_dir: &Path, incident: &Incident) -> Result<()> {
 enum StorageBackend {
     JsonFiles,
     Sqlite,
-}
-
-impl StorageBackend {
-    fn is_sqlite(self) -> bool {
-        matches!(self, StorageBackend::Sqlite)
-    }
+    Supabase,
 }
 
 fn storage_backend() -> StorageBackend {
     match env::var("WATCHDOG_STORAGE") {
         Ok(value) if value.eq_ignore_ascii_case("sqlite") => StorageBackend::Sqlite,
+        Ok(value) if value.eq_ignore_ascii_case("supabase") => StorageBackend::Supabase,
+        Ok(value) if value.eq_ignore_ascii_case("postgres") => StorageBackend::Supabase,
+        Ok(value) if value.eq_ignore_ascii_case("postgrest") => StorageBackend::Supabase,
         Ok(value) if value.eq_ignore_ascii_case("db") => StorageBackend::Sqlite,
         Ok(value) if value.eq_ignore_ascii_case("database") => StorageBackend::Sqlite,
         _ => StorageBackend::JsonFiles,
@@ -252,6 +260,131 @@ fn read_incident_sqlite(state_dir: &Path, incident_id: &str) -> Result<Option<In
     };
     let incident_json: String = row.get(0)?;
     Ok(Some(serde_json::from_str(&incident_json)?))
+}
+
+#[derive(Debug, Deserialize)]
+struct SupabaseIncidentRow {
+    incident_json: Incident,
+}
+
+#[derive(Debug, Serialize)]
+struct SupabaseIncidentPayload<'a> {
+    id: &'a str,
+    created_at: String,
+    severity: &'a str,
+    status: &'a str,
+    deploy_id: &'a str,
+    environment: &'a str,
+    summary: &'a str,
+    incident_json: &'a Incident,
+    updated_at: String,
+}
+
+fn supabase_url() -> Result<String> {
+    env::var("SUPABASE_URL")
+        .or_else(|_| env::var("NEXT_PUBLIC_SUPABASE_URL"))
+        .map(|value| value.trim_end_matches('/').to_string())
+        .context("SUPABASE_URL is required when WATCHDOG_STORAGE=supabase")
+}
+
+fn supabase_key() -> Result<String> {
+    env::var("SUPABASE_SERVICE_ROLE_KEY")
+        .or_else(|_| env::var("SUPABASE_SERVICE_KEY"))
+        .or_else(|_| env::var("SUPABASE_ANON_KEY"))
+        .context("SUPABASE_SERVICE_ROLE_KEY is required when WATCHDOG_STORAGE=supabase")
+}
+
+fn supabase_headers() -> Result<HeaderMap> {
+    let key = supabase_key()?;
+    let mut headers = HeaderMap::new();
+    headers.insert("apikey", HeaderValue::from_str(&key)?);
+    headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {key}"))?);
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    Ok(headers)
+}
+
+fn supabase_incidents_url(query: &str) -> Result<String> {
+    let base = supabase_url()?;
+    if query.is_empty() {
+        Ok(format!("{base}/rest/v1/incidents"))
+    } else {
+        Ok(format!("{base}/rest/v1/incidents?{query}"))
+    }
+}
+
+fn write_incident_supabase(incident: &Incident) -> Result<()> {
+    let payload = SupabaseIncidentPayload {
+        id: &incident.id,
+        created_at: incident.created_at.to_rfc3339(),
+        severity: &incident.severity,
+        status: &incident.status,
+        deploy_id: &incident.verdict.deploy_id,
+        environment: &incident.verdict.environment,
+        summary: &incident.summary,
+        incident_json: incident,
+        updated_at: Utc::now().to_rfc3339(),
+    };
+
+    let response = Client::new()
+        .post(supabase_incidents_url("on_conflict=id")?)
+        .headers(supabase_headers()?)
+        .header("Prefer", "resolution=merge-duplicates,return=minimal")
+        .json(&payload)
+        .send()?;
+
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        Err(anyhow!("Supabase incident upsert failed: {status} {body}"))
+    }
+}
+
+fn list_incidents_supabase() -> Result<Vec<Incident>> {
+    let response = Client::new()
+        .get(supabase_incidents_url("select=incident_json&order=created_at.desc")?)
+        .headers(supabase_headers()?)
+        .send()?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        return Err(anyhow!("Supabase incident list failed: {status} {body}"));
+    }
+
+    let rows = response.json::<Vec<SupabaseIncidentRow>>()?;
+    Ok(rows.into_iter().map(|row| row.incident_json).collect())
+}
+
+fn read_incident_supabase(incident_id: &str) -> Result<Option<Incident>> {
+    let query = format!(
+        "select=incident_json&id=eq.{}&limit=1",
+        encode_postgrest_value(incident_id)
+    );
+    let response = Client::new()
+        .get(supabase_incidents_url(&query)?)
+        .headers(supabase_headers()?)
+        .send()?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        return Err(anyhow!("Supabase incident read failed: {status} {body}"));
+    }
+
+    let mut rows = response.json::<Vec<SupabaseIncidentRow>>()?;
+    Ok(rows.pop().map(|row| row.incident_json))
+}
+
+fn encode_postgrest_value(value: &str) -> String {
+    value
+        .chars()
+        .flat_map(|ch| match ch {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' => vec![ch],
+            _ => format!("%{:02X}", ch as u32).chars().collect(),
+        })
+        .collect()
 }
 
 fn severity_for(verdict: &RegressionVerdict) -> String {

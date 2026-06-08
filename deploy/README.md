@@ -5,7 +5,7 @@ WatchDog has two deployment tracks:
 - `vercel-demo/`: static GTM preview for Vercel.
 - Root Docker image: live Rust dashboard service for Render, Railway, Fly.io, or any Docker host.
 
-Use the Vercel preview as the easy public product overview. Use the Docker service when you want the hosted app to behave end to end with backend-generated incidents, saved notes, status updates, cached explanations, exports, health checks, and SQLite-backed persistence.
+Use the Vercel preview as the easy public product overview. Use the Docker service when you want the hosted app to behave end to end with backend-generated incidents, saved notes, status updates, cached explanations, exports, health checks, and Supabase or SQLite persistence.
 
 ## Vercel static preview
 
@@ -28,7 +28,7 @@ docker run --rm -p 3000:3000 watchdog-demo
 
 Open `http://localhost:3000`.
 
-From the dashboard, use the scenario buttons to create new persisted incidents. Each scenario sends synthetic deploy, metric, and log events through the Rust detector, then saves the resulting incident in SQLite.
+From the dashboard, use the scenario buttons to create new persisted incidents. Each scenario sends synthetic deploy, metric, and log events through the Rust detector, then saves the resulting incident in the configured storage backend.
 
 Health check:
 
@@ -58,12 +58,12 @@ Recommended environment:
 
 ```bash
 WATCHDOG_EXPLAINER=local
-WATCHDOG_STORAGE=sqlite
-WATCHDOG_STATE_DIR=/data/watchdog
-WATCHDOG_DATABASE_URL=/data/watchdog/watchdog.sqlite
+WATCHDOG_STORAGE=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-Attach a persistent disk at `/data` so the SQLite database, notes, statuses, and generated explanations survive restarts.
+With Supabase storage, Render does not need a persistent disk for incident data. Attach a disk only if you also want local JSONL demo inputs or SQLite fallback files to survive restarts.
 Use the root [`.env.example`](../.env.example) as the starting point for hosted environment variables.
 
 ## Railway
@@ -74,22 +74,49 @@ Recommended variables:
 
 ```bash
 WATCHDOG_EXPLAINER=local
-WATCHDOG_STORAGE=sqlite
-WATCHDOG_STATE_DIR=/data/watchdog
-WATCHDOG_DATABASE_URL=/data/watchdog/watchdog.sqlite
+WATCHDOG_STORAGE=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-Use a Railway volume mounted at `/data` if you want durable incident history.
+With Supabase storage, Railway does not need a volume for incident history.
 
 ## Demo database
 
-The hosted demo uses SQLite:
+The cloud demo can use Supabase Postgres through the Supabase REST API:
 
-```text
-/data/watchdog/watchdog.sqlite
+```bash
+WATCHDOG_STORAGE=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-The application still supports `WATCHDOG_STORAGE=json-files` for the original file-backed mode, but SQLite is better for interviews because `/healthz` can show a real database-backed storage mode.
+Create this table in Supabase SQL Editor:
+
+```sql
+create table if not exists incidents (
+  id text primary key,
+  created_at timestamptz not null,
+  severity text not null,
+  status text not null default 'open',
+  deploy_id text not null,
+  environment text not null,
+  summary text not null,
+  incident_json jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_incidents_created_at
+  on incidents (created_at desc);
+
+create index if not exists idx_incidents_status
+  on incidents (status);
+
+create index if not exists idx_incidents_deploy_id
+  on incidents (deploy_id);
+```
+
+The application still supports `WATCHDOG_STORAGE=sqlite` and `WATCHDOG_STORAGE=json-files` for local demos.
 
 ## Production note
 

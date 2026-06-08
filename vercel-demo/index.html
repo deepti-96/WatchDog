@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WatchDog demo</title>
+  <title>WatchDog</title>
   <style>
     :root {
       --bg: #f3f5fb;
@@ -36,220 +36,240 @@
     }
 
     button, input, textarea { font: inherit; }
+    h1, h2, h3, p { margin: 0; }
 
     .shell {
-      width: min(1200px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 24px 0 36px;
-    }
-
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 18px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 800;
-      letter-spacing: 0;
-    }
-
-    .mark {
-      width: 44px;
-      height: 44px;
-      display: inline-block;
-      flex: none;
-    }
-
-    .mark img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: contain;
-    }
-
-    .hero {
+      width: min(1240px, calc(100vw - 32px));
+      margin: 24px auto;
       display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
-      gap: 18px;
-      align-items: stretch;
-      margin-bottom: 18px;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 20px;
     }
 
-    .hero-main,
-    .panel,
-    .metric,
-    .timeline-item,
-    .slack-alert {
+    .panel, .card, .incident-card {
       border: 1px solid var(--line);
-      background: var(--surface);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.94);
       box-shadow: var(--shadow-sm);
     }
 
-    .hero-main {
-      border-radius: 14px;
+    .sidebar {
       padding: 24px;
       display: grid;
-      align-content: space-between;
-      min-height: 360px;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .detail {
+      padding: 28px;
+      min-height: calc(100vh - 48px);
     }
 
     .eyebrow {
       color: var(--accent-dark);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.14em;
       font-weight: 800;
-      font-size: 0.75rem;
-      margin-bottom: 12px;
+      font-size: 0.72rem;
+      margin-bottom: 8px;
     }
-
-    h1, h2, h3, p { margin: 0; }
 
     h1 {
-      font-size: clamp(2.2rem, 4.4vw, 4rem);
+      font-size: clamp(2rem, 2.5vw, 2.65rem);
       line-height: 1;
       letter-spacing: 0;
-      max-width: 12ch;
     }
 
-    .subhead {
+    h2 {
+      font-size: clamp(1.45rem, 2vw, 2.05rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .muted, .meta {
       color: var(--muted);
       line-height: 1.6;
-      font-size: 1rem;
-      max-width: 62ch;
-      margin-top: 16px;
     }
 
-    .badges {
+    .brand-copy {
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .scenario-card, .workflow-step {
+      padding: 14px;
+    }
+
+    .scenario-actions, .filters {
+      display: grid;
+      gap: 8px;
+    }
+
+    .workflow {
+      display: grid;
+      gap: 10px;
+    }
+
+    .workflow-step {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .step-index {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: rgba(47, 91, 234, 0.1);
+      color: var(--accent-dark);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.8rem;
+    }
+
+    .button {
+      appearance: none;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-weight: 750;
+      background: #fff;
+      color: var(--ink);
+      text-align: center;
+    }
+
+    .button:hover { border-color: var(--accent); }
+    .button:disabled { opacity: 0.62; cursor: wait; }
+
+    .button-primary {
+      background: linear-gradient(135deg, #111827, #1d2b44);
+      color: #fff;
+      border-color: #111827;
+    }
+
+    .control {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .sync {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .stat-grid, .signal-grid, .overview-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .signal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 20px 0 18px; }
+    .overview-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
+
+    .card {
+      padding: 16px;
+      border-left: 4px solid var(--accent);
+    }
+
+    .card.warning { border-left-color: var(--warning); }
+    .card.danger { border-left-color: var(--danger); }
+
+    .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .card strong {
+      display: block;
+      margin-top: 8px;
+      font-size: clamp(1.1rem, 1.35vw, 1.45rem);
+      overflow-wrap: anywhere;
+    }
+
+    .incident-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .incident-card {
+      padding: 14px;
+      cursor: pointer;
+      text-align: left;
+      border-left: 4px solid transparent;
+    }
+
+    .incident-card.active, .incident-card:hover {
+      border-left-color: var(--accent);
+      background: #f8faff;
+    }
+
+    .badge-row {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin-top: 18px;
+      align-items: center;
     }
 
     .badge {
       display: inline-flex;
       align-items: center;
-      border-radius: 8px;
+      justify-content: center;
       padding: 6px 10px;
-      border: 1px solid var(--line);
-      font-size: 0.74rem;
-      font-weight: 800;
+      border-radius: 999px;
+      font-size: 0.72rem;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.07em;
+      font-weight: 800;
+      background: #eef2f7;
+      color: var(--ink);
     }
 
     .badge.high { color: var(--danger); background: rgba(194, 65, 47, 0.12); }
     .badge.open { color: var(--warning); background: rgba(217, 119, 6, 0.15); }
-    .badge.env { color: var(--ink); background: #eef2f7; border-color: #d5dde8; }
+    .badge.resolved { color: var(--ok); background: rgba(44, 126, 92, 0.14); }
     .badge.deploy { color: var(--accent-dark); background: rgba(47, 91, 234, 0.12); }
 
-    .hero-side {
+    .hero {
       display: grid;
-      gap: 12px;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+      gap: 22px;
+      align-items: start;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
     }
 
-    .metric-grid {
+    .actions {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 10px;
     }
 
-    .metric {
-      border-radius: 12px;
-      padding: 14px;
-      border-left: 4px solid var(--accent);
+    .section-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.75fr);
+      gap: 16px;
+      align-items: start;
     }
 
-    .metric.warning { border-left-color: var(--warning); }
-    .metric.danger { border-left-color: var(--danger); }
-
-    .label {
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.09em;
-      font-size: 0.72rem;
-      font-weight: 800;
-    }
-
-    .metric strong {
-      display: block;
-      margin: 8px 0 5px;
-      font-size: 1.65rem;
-      letter-spacing: 0;
-    }
-
-    .metric p {
-      color: var(--muted);
-      line-height: 1.45;
-      font-size: 0.92rem;
-    }
-
-    .panel {
-      border-radius: 14px;
+    .section {
       padding: 18px;
-    }
-
-    .panel-heading {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      align-items: baseline;
-      margin-bottom: 16px;
-    }
-
-    .panel-heading h2 {
-      font-size: 1.12rem;
-      letter-spacing: 0;
-    }
-
-    .panel-heading span {
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    .compare {
-      display: grid;
-      gap: 10px;
-    }
-
-    .compare-row {
-      display: grid;
-      grid-template-columns: 130px 1fr 1fr;
-      gap: 10px;
-      align-items: center;
-      padding: 10px 0;
-      border-top: 1px solid #e2e8f0;
-    }
-
-    .compare-row:first-child { border-top: none; }
-
-    .bar {
-      height: 10px;
-      border-radius: 999px;
-      background: #e2e8f0;
-      overflow: hidden;
-    }
-
-    .bar span {
-      display: block;
-      height: 100%;
-      border-radius: inherit;
-      background: var(--accent);
-    }
-
-    .bar.danger span { background: var(--danger); }
-    .bar.warning span { background: var(--warning); }
-
-    .content-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
-      gap: 18px;
+      margin-top: 16px;
     }
 
     .timeline {
@@ -258,292 +278,345 @@
     }
 
     .timeline-item {
-      border-radius: 12px;
-      padding: 14px;
-      display: grid;
-      grid-template-columns: 120px 1fr;
-      gap: 12px;
-      border-left: 4px solid var(--accent);
-    }
-
-    .timeline-item time {
-      color: var(--muted);
-      font-weight: 800;
-      font-size: 0.88rem;
-    }
-
-    .timeline-item strong {
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .timeline-item p {
-      color: var(--muted);
-      line-height: 1.45;
-    }
-
-    .slack-alert {
-      border-radius: 14px;
-      padding: 18px;
-      background: #fbfcfe;
-    }
-
-    .slack-title {
-      font-weight: 900;
-      margin-bottom: 10px;
-    }
-
-    .slack-alert p {
-      color: var(--muted);
-      line-height: 1.55;
-      margin-bottom: 12px;
-    }
-
-    .slack-fields {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .slack-field {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px;
-      background: #ffffff;
-    }
-
-    .slack-field span {
-      display: block;
-      color: var(--muted);
-      font-size: 0.8rem;
-      margin-bottom: 4px;
-    }
-
-    .cta {
-      margin-top: 18px;
-      padding: 16px 18px;
-      border: 1px solid #1f2937;
-      border-radius: 14px;
-      color: #ffffff;
-      background: #172033;
-      box-shadow: var(--shadow-sm);
-      display: flex;
-      justify-content: space-between;
-      gap: 18px;
-      align-items: center;
-    }
-
-    .cta p {
-      color: rgba(255, 255, 255, 0.8);
-      margin-top: 4px;
-      line-height: 1.5;
-    }
-
-    .cta-code {
-      border-radius: 10px;
       padding: 12px 14px;
-      background: rgba(255, 255, 255, 0.12);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      white-space: nowrap;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
     }
 
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      color: #0f172a;
-      background: #f1f5f9;
-      border: 1px solid #dbe4ef;
-      border-radius: 6px;
-      padding: 2px 5px;
+    pre, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+      color: var(--ink);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
-    @media (max-width: 900px) {
-      .hero,
-      .content-grid {
-        grid-template-columns: 1fr;
-      }
+    textarea { min-height: 120px; resize: vertical; }
 
-      .hero-main {
-        min-height: auto;
-      }
-
-      h1 {
-        max-width: 12ch;
-      }
+    .empty {
+      padding: 24px;
+      color: var(--muted);
+      border-style: dashed;
     }
 
-    @media (max-width: 640px) {
-      .shell {
-        width: min(100vw - 20px, 100%);
-        padding-top: 12px;
-      }
+    @media (max-width: 1050px) {
+      .shell, .hero, .section-grid { grid-template-columns: 1fr; }
+    }
 
-      .topbar,
-      .cta {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
-      .metric-grid,
-      .slack-fields {
-        grid-template-columns: 1fr;
-      }
-
-      .compare-row,
-      .timeline-item {
-        grid-template-columns: 1fr;
-      }
-
-      .cta-code {
-        width: 100%;
-        white-space: normal;
-      }
+    @media (max-width: 720px) {
+      .shell { width: calc(100vw - 18px); margin: 10px auto; }
+      .sidebar, .detail { padding: 18px; }
+      .stat-grid, .signal-grid, .overview-grid, .actions { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <span class="mark" aria-hidden="true">
-          <img src="assets/watchdog-logo.png" alt="">
-        </span>
-        <span>WatchDog</span>
-      </div>
-    </header>
-
-    <section class="hero" aria-label="Incident summary">
-      <div class="hero-main">
-        <div>
-          <div class="eyebrow">Deployment regression detected</div>
-          <h1>Release broke after deploy.</h1>
-          <p class="subhead">
-            WatchDog correlates deploy events with live metrics and log signatures, then turns the evidence
-            into a plain-English incident narrative your GTM, support, and engineering teams can understand fast.
-          </p>
-          <div class="badges">
-            <span class="badge high">High</span>
-            <span class="badge open">Open</span>
-            <span class="badge env">Demo</span>
-            <span class="badge deploy">Deploy v-gtm-demo</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="hero-side">
-        <div class="metric-grid">
-          <article class="metric warning">
-            <div class="label">Detection delay</div>
-            <strong>5s</strong>
-            <p>Time between deploy and detected regression.</p>
-          </article>
-          <article class="metric danger">
-            <div class="label">Error delta</div>
-            <strong>+0.098</strong>
-            <p>Error rate shifted above the rolling baseline.</p>
-          </article>
-          <article class="metric warning">
-            <div class="label">Latency delta</div>
-            <strong>+142.8ms</strong>
-            <p>P95 latency moved sharply after release.</p>
-          </article>
-          <article class="metric">
-            <div class="label">Traffic</div>
-            <strong>405 req/s</strong>
-            <p>Request volume when the verdict was raised.</p>
-          </article>
-        </div>
-
-        <article class="panel">
-          <div class="panel-heading">
-            <h2>Dominant new error</h2>
-            <span>Seen 3 times</span>
-          </div>
-          <p><code>api: database timeout for user &lt;num&gt; request &lt;id&gt;</code></p>
-        </article>
-      </div>
-    </section>
-
-    <section class="content-grid">
-      <div class="panel">
-        <div class="panel-heading">
-          <h2>Before vs after</h2>
-          <span>Rolling baseline against detected state</span>
-        </div>
-        <div class="compare">
-          <div class="compare-row">
-            <strong>Error rate</strong>
-            <div>
-              <div class="label">Baseline 0.012</div>
-              <div class="bar"><span style="width: 12%"></span></div>
-            </div>
-            <div>
-              <div class="label">Detected 0.110</div>
-              <div class="bar danger"><span style="width: 92%"></span></div>
-            </div>
-          </div>
-          <div class="compare-row">
-            <strong>P95 latency</strong>
-            <div>
-              <div class="label">Baseline 117.2ms</div>
-              <div class="bar"><span style="width: 39%"></span></div>
-            </div>
-            <div>
-              <div class="label">Detected 260.0ms</div>
-              <div class="bar warning"><span style="width: 86%"></span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <aside class="slack-alert" aria-label="Slack alert preview">
-        <div class="slack-title">Slack alert preview</div>
-        <p><strong>v-gtm-demo</strong> in <code>demo</code> triggered <strong>error rate and latency shifted above baseline</strong>.</p>
-        <div class="slack-fields">
-          <div class="slack-field"><span>Detected after</span><strong>5s</strong></div>
-          <div class="slack-field"><span>Error signal</span><strong>New timeout</strong></div>
-          <div class="slack-field"><span>Error delta</span><strong>+0.098</strong></div>
-          <div class="slack-field"><span>Latency delta</span><strong>+142.8ms</strong></div>
-        </div>
-      </aside>
-    </section>
-
-    <section class="panel" style="margin-top: 24px;">
-      <div class="panel-heading">
-        <h2>Incident timeline</h2>
-        <span>Evidence stitched to the deploy</span>
-      </div>
-      <div class="timeline">
-        <article class="timeline-item">
-          <time>16:31:20 UTC</time>
-          <div>
-            <strong>Deploy started</strong>
-            <p>v-gtm-demo deployed to demo.</p>
-          </div>
-        </article>
-        <article class="timeline-item">
-          <time>16:31:23 UTC</time>
-          <div>
-            <strong>First dominant error</strong>
-            <p>Database timeout signature appeared after release.</p>
-          </div>
-        </article>
-        <article class="timeline-item">
-          <time>16:31:25 UTC</time>
-          <div>
-            <strong>Regression detected</strong>
-            <p>Error rate and latency shifted above baseline.</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="cta">
+  <div class="shell">
+    <aside class="panel sidebar">
       <div>
-        <strong>Local product demo command</strong>
-        <p>Generate this incident locally, then launch the Rust dashboard.</p>
+        <div class="eyebrow">Release safety</div>
+        <h1>watchdog</h1>
+        <p class="brand-copy" style="margin-top: 14px;">A release regression console for engineering teams. This hosted version stores incidents in Supabase and uses Vercel API routes for the dashboard workflow.</p>
       </div>
-      <div class="cta-code">cargo run -- demo</div>
-    </section>
-  </main>
+
+      <section class="panel scenario-card">
+        <div class="label">Hosted workflow</div>
+        <h3>Generate a deploy regression</h3>
+        <p class="meta" style="margin-top: 6px;">Runs a backend scenario and saves a new incident in Supabase.</p>
+        <div class="scenario-actions" style="margin-top: 12px;">
+          <button id="checkout-button" class="button button-primary">Run Checkout Scenario</button>
+          <button id="payments-button" class="button">Run Payments Scenario</button>
+        </div>
+      </section>
+
+      <section class="workflow">
+        <article class="panel workflow-step">
+          <span class="step-index">1</span>
+          <div><strong>Trigger</strong><p class="meta">A deploy event opens a monitoring window.</p></div>
+        </article>
+        <article class="panel workflow-step">
+          <span class="step-index">2</span>
+          <div><strong>Detect</strong><p class="meta">Metrics and logs are compared against baseline.</p></div>
+        </article>
+        <article class="panel workflow-step">
+          <span class="step-index">3</span>
+          <div><strong>Triage</strong><p class="meta">Incidents, notes, explanations, and status are persisted.</p></div>
+        </article>
+      </section>
+
+      <div class="panel sync">
+        <span id="health">Checking Supabase...</span>
+        <button class="button" onclick="loadIncidents()">Refresh</button>
+      </div>
+
+      <section class="stat-grid">
+        <article class="card"><div class="label">Incidents</div><strong id="incident-count">0</strong></article>
+        <article class="card danger"><div class="label">High Severity</div><strong id="high-count">0</strong></article>
+        <article class="card"><div class="label">AI Cached</div><strong id="cached-count">0</strong></article>
+      </section>
+
+      <section class="filters">
+        <input id="search" class="control" type="search" placeholder="Search incidents">
+        <select id="status-filter" class="control">
+          <option value="all">All states</option>
+          <option value="open">Open only</option>
+          <option value="resolved">Resolved only</option>
+        </select>
+      </section>
+
+      <div id="incident-list" class="incident-list"></div>
+    </aside>
+
+    <main id="detail" class="panel detail"></main>
+  </div>
+
+  <script>
+    let incidents = [];
+    let activeIncidentId = null;
+    let search = '';
+    let statusFilter = 'all';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('checkout-button').addEventListener('click', () => createScenario('checkout-timeout'));
+      document.getElementById('payments-button').addEventListener('click', () => createScenario('payments-latency'));
+      document.getElementById('search').addEventListener('input', (event) => {
+        search = event.target.value.trim().toLowerCase();
+        renderList();
+      });
+      document.getElementById('status-filter').addEventListener('change', (event) => {
+        statusFilter = event.target.value;
+        renderList();
+      });
+      checkHealth();
+      loadIncidents();
+    });
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      });
+      const text = await response.text();
+      const body = text ? JSON.parse(text) : null;
+      if (!response.ok) {
+        throw new Error(body?.error || text || response.statusText);
+      }
+      return body;
+    }
+
+    async function checkHealth() {
+      try {
+        const health = await api('/api/healthz');
+        document.getElementById('health').textContent = `${health.storage_backend} connected · ${health.incident_count} incidents`;
+      } catch (error) {
+        document.getElementById('health').textContent = `Storage not ready: ${error.message}`;
+      }
+    }
+
+    async function loadIncidents() {
+      try {
+        incidents = await api('/api/incidents');
+        if (!activeIncidentId && incidents[0]) activeIncidentId = incidents[0].id;
+        renderStats();
+        renderList();
+        if (activeIncidentId) {
+          await selectIncident(activeIncidentId);
+        } else {
+          renderEmpty();
+        }
+        checkHealth();
+      } catch (error) {
+        document.getElementById('incident-list').innerHTML = `<div class="panel empty">${escapeHtml(error.message)}</div>`;
+        renderEmpty(error.message);
+      }
+    }
+
+    async function createScenario(scenario) {
+      setScenarioButtons(true);
+      try {
+        const result = await api('/api/demo/scenarios', {
+          method: 'POST',
+          body: JSON.stringify({ scenario }),
+        });
+        activeIncidentId = result.incident_id;
+        await loadIncidents();
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setScenarioButtons(false);
+      }
+    }
+
+    function setScenarioButtons(disabled) {
+      document.getElementById('checkout-button').disabled = disabled;
+      document.getElementById('payments-button').disabled = disabled;
+    }
+
+    function visibleIncidents() {
+      return incidents.filter((incident) => {
+        const haystack = `${incident.deploy_id} ${incident.summary} ${incident.environment}`.toLowerCase();
+        return (!search || haystack.includes(search))
+          && (statusFilter === 'all' || incident.status === statusFilter);
+      });
+    }
+
+    function renderStats() {
+      document.getElementById('incident-count').textContent = incidents.length;
+      document.getElementById('high-count').textContent = incidents.filter((incident) => incident.severity === 'high').length;
+      document.getElementById('cached-count').textContent = incidents.filter((incident) => incident.has_cached_explanation).length;
+    }
+
+    function renderList() {
+      const visible = visibleIncidents();
+      const list = document.getElementById('incident-list');
+      if (!visible.length) {
+        list.innerHTML = '<div class="panel empty">No incidents match the current filters.</div>';
+        return;
+      }
+      list.innerHTML = visible.map((incident) => `
+        <article class="incident-card ${incident.id === activeIncidentId ? 'active' : ''}" onclick="selectIncident('${incident.id}')">
+          <div class="badge-row">
+            ${badge(incident.severity, incident.severity)}
+            ${badge(incident.status, incident.status)}
+            ${badge('deploy', incident.environment)}
+            ${incident.has_cached_explanation ? badge('deploy', 'AI cached') : ''}
+          </div>
+          <h3 style="margin-top: 10px;">${escapeHtml(incident.deploy_id)}</h3>
+          <p class="meta">${new Date(incident.created_at).toLocaleString()}</p>
+          <p class="meta" style="margin-top: 8px;">${escapeHtml(incident.summary)}</p>
+        </article>
+      `).join('');
+    }
+
+    async function selectIncident(id) {
+      activeIncidentId = id;
+      renderList();
+      const incident = await api(`/api/incidents/${encodeURIComponent(id)}`);
+      renderDetail(incident);
+    }
+
+    function renderEmpty(message = 'No incidents yet. Run a scenario from the sidebar to create one in Supabase.') {
+      document.getElementById('detail').innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+    }
+
+    function renderDetail(incident) {
+      const verdict = incident.verdict;
+      const c = verdict.comparison;
+      document.getElementById('detail').innerHTML = `
+        <section class="hero">
+          <div>
+            <div class="badge-row">
+              ${badge(incident.severity, incident.severity)}
+              ${badge(incident.status, incident.status)}
+              ${badge('deploy', verdict.environment)}
+              ${badge('deploy', `deploy ${verdict.deploy_id}`)}
+            </div>
+            <h2 style="margin-top: 14px;">${escapeHtml(incident.summary)}</h2>
+            <p class="muted" style="margin-top: 12px;">WatchDog flagged this release ${verdict.seconds_after_deploy}s after deploy. The hosted dashboard reads and writes the incident record through Supabase.</p>
+          </div>
+          <div class="actions">
+            <button class="button button-primary" onclick="explainIncident('${incident.id}')">Explain Incident</button>
+            <button class="button" onclick="loadIncidents()">Refresh Incidents</button>
+            <button class="button" onclick="copySummary('${incident.id}')">Copy Summary</button>
+            <button class="button" onclick="setStatus('${incident.id}', '${incident.status === 'open' ? 'resolved' : 'open'}')">${incident.status === 'open' ? 'Mark Resolved' : 'Mark Open'}</button>
+          </div>
+        </section>
+
+        <section class="signal-grid">
+          ${card('Detection Delay', `${verdict.seconds_after_deploy}s`, 'Time between deploy and detected regression')}
+          ${card('Top Error Signature', verdict.top_error_signature || 'No dominant error captured', `Seen ${verdict.top_error_count} times after deploy`, 'danger')}
+          ${card('Requests At Detection', `${c.request_rate_at_detection.toFixed(1)} req/s`, 'Traffic volume when the verdict was raised')}
+        </section>
+
+        <section class="overview-grid">
+          ${card('Error Rate Delta', verdict.error_rate_delta.toFixed(3), '')}
+          ${card('Latency Delta', `${verdict.latency_delta_ms.toFixed(1)} ms`, '')}
+          ${card('Deploy Time', formatTime(verdict.deploy_timestamp), '')}
+          ${card('Detected At', formatTime(verdict.detected_at), '')}
+        </section>
+
+        <section class="section-grid">
+          <article class="panel section">
+            <div class="label">Incident Timeline</div>
+            <div class="timeline" style="margin-top: 14px;">
+              ${verdict.timeline.map((event) => `
+                <div class="timeline-item">
+                  <strong>${escapeHtml(event.label)}</strong>
+                  <p class="meta">${formatTime(event.timestamp)} · ${escapeHtml(event.detail)}</p>
+                </div>
+              `).join('')}
+            </div>
+          </article>
+          <article class="panel section">
+            <div class="label">Investigation Notes</div>
+            <textarea id="notes">${escapeHtml(incident.notes || '')}</textarea>
+            <button class="button" style="margin-top: 10px;" onclick="saveNotes('${incident.id}')">Save Notes</button>
+          </article>
+        </section>
+
+        <section class="panel section">
+          <div class="label">Detector Verdict</div>
+          <pre style="margin-top: 12px;">${escapeHtml(incident.alert_text)}</pre>
+        </section>
+
+        <section class="panel section">
+          <div class="label">AI Explanation</div>
+          <pre id="explanation" style="margin-top: 12px;">${escapeHtml(incident.cached_explanation || 'Click Explain Incident to generate and store an explanation in Supabase.')}</pre>
+        </section>
+      `;
+    }
+
+    async function explainIncident(id) {
+      const result = await api(`/api/incidents/${encodeURIComponent(id)}/explain`, { method: 'POST' });
+      document.getElementById('explanation').textContent = result.explanation;
+      await loadIncidents();
+    }
+
+    async function saveNotes(id) {
+      const notes = document.getElementById('notes').value;
+      await api(`/api/incidents/${encodeURIComponent(id)}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ notes }),
+      });
+      await loadIncidents();
+    }
+
+    async function setStatus(id, status) {
+      await api(`/api/incidents/${encodeURIComponent(id)}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      });
+      await loadIncidents();
+    }
+
+    async function copySummary(id) {
+      const incident = await api(`/api/incidents/${encodeURIComponent(id)}`);
+      const text = `${incident.summary}\n${incident.alert_text}`;
+      await navigator.clipboard.writeText(text);
+    }
+
+    function card(label, value, detail, tone = '') {
+      return `<article class="card ${tone}"><div class="label">${escapeHtml(label)}</div><strong>${escapeHtml(value)}</strong>${detail ? `<p class="meta" style="margin-top: 8px;">${escapeHtml(detail)}</p>` : ''}</article>`;
+    }
+
+    function badge(kind, label) {
+      return `<span class="badge ${kind}">${escapeHtml(label)}</span>`;
+    }
+
+    function formatTime(value) {
+      return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
+  </script>
 </body>
 </html>
