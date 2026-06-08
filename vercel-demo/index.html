@@ -6,20 +6,21 @@
   <title>WatchDog</title>
   <style>
     :root {
-      --bg: #f3f5fb;
-      --surface: #ffffff;
-      --surface-soft: #f8fafc;
-      --ink: #162033;
-      --muted: #526071;
-      --line: #d6dce8;
-      --line-strong: #a6b0c2;
-      --accent: #2f5bea;
-      --accent-dark: #2446b8;
-      --danger: #c2412f;
-      --warning: #9a5d11;
-      --ok: #2c7e5c;
-      --shadow: 0 18px 46px rgba(15, 23, 42, 0.09);
-      --shadow-sm: 0 8px 22px rgba(15, 23, 42, 0.06);
+      color-scheme: dark;
+      --bg: #0f1724;
+      --surface: rgba(21, 30, 45, 0.96);
+      --surface-soft: rgba(28, 39, 58, 0.94);
+      --ink: #f5f7fb;
+      --muted: #a6b0c2;
+      --line: rgba(144, 160, 190, 0.22);
+      --line-strong: rgba(166, 181, 210, 0.38);
+      --accent: #91a7ff;
+      --accent-dark: #c7d2ff;
+      --danger: #ff9a86;
+      --warning: #f2c36b;
+      --ok: #79d6a3;
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+      --shadow-sm: 0 10px 28px rgba(0, 0, 0, 0.24);
     }
 
     * { box-sizing: border-box; }
@@ -30,9 +31,9 @@
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--ink);
       background:
-        linear-gradient(120deg, rgba(47, 91, 234, 0.08), transparent 34%),
-        linear-gradient(145deg, transparent 0%, rgba(183, 121, 31, 0.06) 78%, rgba(183, 121, 31, 0.1) 100%),
-        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+        linear-gradient(120deg, rgba(145, 167, 255, 0.14), transparent 34%),
+        linear-gradient(145deg, transparent 0%, rgba(242, 195, 107, 0.07) 78%, rgba(242, 195, 107, 0.12) 100%),
+        linear-gradient(180deg, #0b111c 0%, var(--bg) 100%);
     }
 
     button, input, textarea { font: inherit; }
@@ -49,7 +50,7 @@
     .panel, .card, .incident-card {
       border: 1px solid var(--line);
       border-radius: 14px;
-      background: rgba(255, 255, 255, 0.94);
+      background: var(--surface);
       box-shadow: var(--shadow-sm);
     }
 
@@ -121,7 +122,7 @@
       width: 26px;
       height: 26px;
       border-radius: 999px;
-      background: rgba(47, 91, 234, 0.1);
+      background: rgba(145, 167, 255, 0.13);
       color: var(--accent-dark);
       display: inline-flex;
       align-items: center;
@@ -137,7 +138,7 @@
       padding: 12px 14px;
       cursor: pointer;
       font-weight: 750;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.04);
       color: var(--ink);
       text-align: center;
     }
@@ -146,9 +147,9 @@
     .button:disabled { opacity: 0.62; cursor: wait; }
 
     .button-primary {
-      background: linear-gradient(135deg, #111827, #1d2b44);
-      color: #fff;
-      border-color: #111827;
+      background: linear-gradient(135deg, #dfe5ff, #91a7ff);
+      color: #101827;
+      border-color: rgba(199, 210, 255, 0.75);
     }
 
     .control {
@@ -156,7 +157,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 12px 14px;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.04);
       color: var(--ink);
     }
 
@@ -216,7 +217,7 @@
 
     .incident-card.active, .incident-card:hover {
       border-left-color: var(--accent);
-      background: #f8faff;
+      background: rgba(145, 167, 255, 0.08);
     }
 
     .badge-row {
@@ -236,14 +237,14 @@
       text-transform: uppercase;
       letter-spacing: 0.07em;
       font-weight: 800;
-      background: #eef2f7;
+      background: rgba(255, 255, 255, 0.07);
       color: var(--ink);
     }
 
-    .badge.high { color: var(--danger); background: rgba(194, 65, 47, 0.12); }
-    .badge.open { color: var(--warning); background: rgba(217, 119, 6, 0.15); }
-    .badge.resolved { color: var(--ok); background: rgba(44, 126, 92, 0.14); }
-    .badge.deploy { color: var(--accent-dark); background: rgba(47, 91, 234, 0.12); }
+    .badge.high { color: var(--danger); background: rgba(255, 154, 134, 0.14); }
+    .badge.open { color: var(--warning); background: rgba(242, 195, 107, 0.14); }
+    .badge.resolved { color: var(--ok); background: rgba(121, 214, 163, 0.13); }
+    .badge.deploy { color: var(--accent-dark); background: rgba(145, 167, 255, 0.13); }
 
     .hero {
       display: grid;
@@ -281,7 +282,7 @@
       padding: 12px 14px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.04);
     }
 
     pre, textarea {
@@ -289,7 +290,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 14px;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.04);
       color: var(--ink);
       line-height: 1.6;
       white-space: pre-wrap;
