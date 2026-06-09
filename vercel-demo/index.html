@@ -309,6 +309,28 @@
       background: rgba(255, 255, 255, 0.04);
     }
 
+    .trust-list, .agent-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .trust-item, .agent-item {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--muted);
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .trust-item strong, .agent-item strong {
+      color: var(--ink);
+      display: block;
+      margin-bottom: 2px;
+    }
+
     pre, textarea {
       width: 100%;
       border: 1px solid var(--line);
@@ -350,6 +372,15 @@
       </div>
 
       <section class="panel scenario-card">
+        <div class="label">Trust model</div>
+        <div class="trust-list">
+          <div class="trust-item"><strong>Durable audit trail</strong>Incidents, notes, status, explanations, and agent reports are stored as Supabase records.</div>
+          <div class="trust-item"><strong>Evidence-bounded agent</strong>Recommendations only use the metrics, logs, deploy timing, and baseline shown in the incident.</div>
+          <div class="trust-item"><strong>Server-side storage key</strong>The Supabase service role stays inside Vercel API routes, never client JavaScript.</div>
+        </div>
+      </section>
+
+      <section class="panel scenario-card">
         <div class="label">Production release</div>
         <h3>Deploy candidate to production</h3>
         <p class="meta" style="margin-top: 6px;">Starts a release-monitoring window, compares against the previous stable version, and saves the regression if guardrails trip.</p>
@@ -383,7 +414,7 @@
       <section class="stat-grid">
         <article class="card"><div class="label">Incidents</div><strong id="incident-count">0</strong></article>
         <article class="card danger"><div class="label">High Severity</div><strong id="high-count">0</strong></article>
-        <article class="card"><div class="label">AI Cached</div><strong id="cached-count">0</strong></article>
+        <article class="card"><div class="label">Agent Reviewed</div><strong id="agent-count">0</strong></article>
       </section>
 
       <section class="filters">
@@ -526,7 +557,7 @@
     function renderStats() {
       document.getElementById('incident-count').textContent = incidents.length;
       document.getElementById('high-count').textContent = incidents.filter((incident) => incident.severity === 'high').length;
-      document.getElementById('cached-count').textContent = incidents.filter((incident) => incident.has_cached_explanation).length;
+      document.getElementById('agent-count').textContent = incidents.filter((incident) => incident.has_agent_report).length;
     }
 
     function renderList() {
@@ -542,7 +573,7 @@
             ${badge(incident.severity, incident.severity)}
             ${badge(incident.status, incident.status)}
             ${badge('deploy', incident.environment)}
-            ${incident.has_cached_explanation ? badge('deploy', 'AI cached') : ''}
+            ${incident.has_agent_report ? badge('deploy', 'agent reviewed') : ''}
           </div>
           <h3 style="margin-top: 10px;">${escapeHtml(incident.deploy_id)}</h3>
           <p class="meta">${new Date(incident.created_at).toLocaleString()}</p>
@@ -579,6 +610,7 @@
           </div>
           <div class="actions">
             <button class="button button-primary" onclick="explainIncident('${incident.id}')">Explain Incident</button>
+            <button class="button" onclick="runAgent('${incident.id}')">Run Triage Agent</button>
             <button class="button" onclick="loadIncidents()">Refresh Incidents</button>
             <button class="button" onclick="copySummary('${incident.id}')">Copy Summary</button>
             <button class="button" onclick="setStatus('${incident.id}', '${incident.status === 'open' ? 'resolved' : 'open'}')">${incident.status === 'open' ? 'Mark Resolved' : 'Mark Open'}</button>
@@ -623,8 +655,13 @@
         </section>
 
         <section class="panel section">
-          <div class="label">AI Explanation</div>
+          <div class="label">Evidence Explanation</div>
           <pre id="explanation" style="margin-top: 12px;">${escapeHtml(incident.cached_explanation || 'Click Explain Incident to generate and store an explanation in Supabase.')}</pre>
+        </section>
+
+        <section class="panel section">
+          <div class="label">Triage Agent</div>
+          <div id="agent-report" style="margin-top: 12px;">${renderAgentReport(incident.agent_report)}</div>
         </section>
       `;
     }
@@ -632,6 +669,12 @@
     async function explainIncident(id) {
       const result = await api(`/api/incidents/${encodeURIComponent(id)}/explain`, { method: 'POST' });
       document.getElementById('explanation').textContent = result.explanation;
+      await loadIncidents();
+    }
+
+    async function runAgent(id) {
+      const result = await api(`/api/incidents/${encodeURIComponent(id)}/agent`, { method: 'POST' });
+      document.getElementById('agent-report').innerHTML = renderAgentReport(result.agent_report);
       await loadIncidents();
     }
 
@@ -660,6 +703,25 @@
 
     function card(label, value, detail, tone = '') {
       return `<article class="card ${tone}"><div class="label">${escapeHtml(label)}</div><strong>${escapeHtml(value)}</strong>${detail ? `<p class="meta" style="margin-top: 8px;">${escapeHtml(detail)}</p>` : ''}</article>`;
+    }
+
+    function renderAgentReport(report) {
+      if (!report) {
+        return '<div class="empty">Run the triage agent to create a stored, evidence-bounded recommendation for this incident.</div>';
+      }
+      return `
+        <div class="signal-grid">
+          ${card('Confidence', report.confidence, 'Based only on stored evidence')}
+          ${card('Audit Status', report.audit_status, `Generated ${formatTime(report.generated_at)}`)}
+          ${card('Recommended Action', report.recommended_action, '')}
+        </div>
+        <div class="agent-list">
+          <div class="agent-item"><strong>Hypothesis</strong>${escapeHtml(report.hypothesis)}</div>
+          <div class="agent-item"><strong>Evidence Used</strong>${escapeHtml(report.evidence_used.join('\\n'))}</div>
+          <div class="agent-item"><strong>Next Checks</strong>${escapeHtml(report.next_checks.join('\\n'))}</div>
+          <div class="agent-item"><strong>Limitations</strong>${escapeHtml(report.limitations.join('\\n'))}</div>
+        </div>
+      `;
     }
 
     function badge(kind, label) {

@@ -43,6 +43,7 @@ function listItem(incident) {
     deploy_id: incident.verdict.deploy_id,
     environment: incident.verdict.environment,
     has_cached_explanation: Boolean(incident.cached_explanation),
+    has_agent_report: Boolean(incident.agent_report),
     status: incident.status || 'open',
     has_notes: Boolean((incident.notes || '').trim()),
   };
@@ -172,6 +173,51 @@ Deploy \`${verdict.deploy_id}\` likely introduced a backend regression in \`${ve
 High based on deploy timing, metric deltas, and log evidence.`;
 }
 
+function buildAgentReport(incident) {
+  const verdict = incident.verdict;
+  const comparison = verdict.comparison;
+  const errorMultiplier = comparison.baseline_error_rate > 0
+    ? comparison.detected_error_rate / comparison.baseline_error_rate
+    : 0;
+  const latencyMultiplier = comparison.baseline_latency_ms > 0
+    ? comparison.detected_latency_ms / comparison.baseline_latency_ms
+    : 0;
+  const confidence = verdict.top_error_is_new && (errorMultiplier >= 4 || latencyMultiplier >= 2)
+    ? 'high'
+    : 'medium';
+  const shouldRollback = verdict.error_rate_delta >= 0.08 || verdict.latency_delta_ms >= 200;
+  const action = shouldRollback
+    ? 'Gate or roll back the release while the owning service checks the deploy diff.'
+    : 'Keep the release under elevated watch and inspect traces for the dominant signature.';
+
+  return {
+    generated_at: new Date().toISOString(),
+    audit_status: 'stored in Supabase incident_json',
+    confidence,
+    hypothesis: `${verdict.deploy_id} likely regressed ${verdict.environment} because post-deploy health diverged from the previous stable baseline within ${verdict.seconds_after_deploy}s.`,
+    recommended_action: action,
+    evidence_used: [
+      `deploy: ${verdict.deploy_id}`,
+      `environment: ${verdict.environment}`,
+      `baseline error rate: ${comparison.baseline_error_rate.toFixed(3)}`,
+      `detected error rate: ${comparison.detected_error_rate.toFixed(3)}`,
+      `baseline p95 latency: ${comparison.baseline_latency_ms.toFixed(1)}ms`,
+      `detected p95 latency: ${comparison.detected_latency_ms.toFixed(1)}ms`,
+      `top error signature: ${verdict.top_error_signature || 'none captured'}`,
+    ],
+    next_checks: [
+      'Compare the deploy diff against the service owning the dominant signature.',
+      'Inspect traces and logs from the first post-deploy error timestamp.',
+      'Confirm whether rollback returns error rate and latency to baseline.',
+    ],
+    limitations: [
+      'This agent only uses the stored incident evidence shown in this dashboard.',
+      'It does not inspect source code, distributed traces, customer tickets, or cloud provider status.',
+      'The demo release inputs are generated, while persistence, status, notes, explanations, and agent reports are real Supabase-backed records.',
+    ],
+  };
+}
+
 function sendJson(res, status, body) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
@@ -183,6 +229,7 @@ function sendError(res, error) {
 }
 
 module.exports = {
+  buildAgentReport,
   createScenarioIncident,
   explainIncident,
   listIncidents,
