@@ -218,6 +218,34 @@ function buildAgentReport(incident) {
   };
 }
 
+function autonomouslyTriageIncident(incident) {
+  const triaged = {
+    ...incident,
+    cached_explanation: incident.cached_explanation || explainIncident(incident),
+    cached_explanation_updated_at: incident.cached_explanation_updated_at || new Date().toISOString(),
+  };
+  triaged.agent_report = buildAgentReport(triaged);
+  triaged.agent_report_updated_at = new Date().toISOString();
+  triaged.autonomous_run = {
+    mode: 'deploy-webhook',
+    completed_at: new Date().toISOString(),
+    actions: [
+      'accepted production deploy event',
+      'compared post-deploy health against previous stable baseline',
+      'opened incident after guardrail breach',
+      'generated evidence explanation',
+      'generated triage recommendation',
+      'persisted audit trail to Supabase',
+    ],
+    guardrails: [
+      'does not auto-rollback production',
+      'does not claim evidence outside the stored incident',
+      'keeps Supabase service role server-side',
+    ],
+  };
+  return triaged;
+}
+
 function sendJson(res, status, body) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
@@ -229,6 +257,7 @@ function sendError(res, error) {
 }
 
 module.exports = {
+  autonomouslyTriageIncident,
   buildAgentReport,
   createScenarioIncident,
   explainIncident,

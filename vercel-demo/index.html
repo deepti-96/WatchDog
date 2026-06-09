@@ -375,18 +375,19 @@
         <div class="label">Trust model</div>
         <div class="trust-list">
           <div class="trust-item"><strong>Durable audit trail</strong>Incidents, notes, status, explanations, and agent reports are stored as Supabase records.</div>
+          <div class="trust-item"><strong>Autonomous after deploy</strong>A deploy event starts monitoring, opens an incident, explains it, runs triage, and stores the report.</div>
           <div class="trust-item"><strong>Evidence-bounded agent</strong>Recommendations only use the metrics, logs, deploy timing, and baseline shown in the incident.</div>
           <div class="trust-item"><strong>Server-side storage key</strong>The Supabase service role stays inside Vercel API routes, never client JavaScript.</div>
         </div>
       </section>
 
       <section class="panel scenario-card">
-        <div class="label">Production release</div>
-        <h3>Deploy candidate to production</h3>
-        <p class="meta" style="margin-top: 6px;">Starts a release-monitoring window, compares against the previous stable version, and saves the regression if guardrails trip.</p>
+        <div class="label">Autonomous release monitor</div>
+        <h3>Trigger production deploy event</h3>
+        <p class="meta" style="margin-top: 6px;">The deploy event runs the monitor and triage agent without presenter steps. Rollback stays human-approved.</p>
         <div class="scenario-actions" style="margin-top: 12px;">
-          <button id="checkout-button" class="button button-primary">Deploy Checkout Release</button>
-          <button id="payments-button" class="button">Deploy Payments Release</button>
+          <button id="checkout-button" class="button button-primary">Deploy Checkout API</button>
+          <button id="payments-button" class="button">Deploy Payments API</button>
         </div>
         <div id="release-log" class="release-log"></div>
       </section>
@@ -505,8 +506,8 @@
       setScenarioButtons(true);
       try {
         renderReleaseLog([
-          ['Deploy', scenario === 'payments-latency' ? 'Promoting payments-api candidate' : 'Promoting checkout-api candidate'],
-          ['Monitor', 'Opening 5 minute production guardrail window'],
+          ['Webhook', scenario === 'payments-latency' ? 'Received payments-api deploy event' : 'Received checkout-api deploy event'],
+          ['Monitor', 'Autonomous guardrail window opened'],
           ['Baseline', 'Comparing against previous stable release'],
         ]);
         await wait(650);
@@ -517,7 +518,8 @@
         renderReleaseLog([
           ['Deploy', `${result.incident.verdict.deploy_id} is live in production`],
           ['Signal', result.incident.verdict.reason],
-          ['Incident', 'Regression persisted to Supabase'],
+          ['Agent', 'Explanation and triage report generated'],
+          ['Audit', 'Incident persisted to Supabase'],
         ]);
         activeIncidentId = result.incident_id;
         await loadIncidents();
@@ -604,13 +606,14 @@
               ${badge(incident.status, incident.status)}
               ${badge('deploy', verdict.environment)}
               ${badge('deploy', `deploy ${verdict.deploy_id}`)}
+              ${incident.autonomous_run ? badge('deploy', 'autonomous triage') : ''}
             </div>
             <h2 style="margin-top: 14px;">${escapeHtml(incident.summary)}</h2>
-            <p class="muted" style="margin-top: 12px;">WatchDog flagged this production release ${verdict.seconds_after_deploy}s after deploy by comparing the new version against the previous stable baseline. The incident record is persisted in Supabase.</p>
+            <p class="muted" style="margin-top: 12px;">WatchDog accepted the deploy event, compared the release against the previous stable baseline, generated the explanation and triage report, then persisted the incident in Supabase.</p>
           </div>
           <div class="actions">
-            <button class="button button-primary" onclick="explainIncident('${incident.id}')">Explain Incident</button>
-            <button class="button" onclick="runAgent('${incident.id}')">Run Triage Agent</button>
+            <button class="button button-primary" onclick="explainIncident('${incident.id}')">Regenerate Explanation</button>
+            <button class="button" onclick="runAgent('${incident.id}')">Re-run Triage Agent</button>
             <button class="button" onclick="loadIncidents()">Refresh Incidents</button>
             <button class="button" onclick="copySummary('${incident.id}')">Copy Summary</button>
             <button class="button" onclick="setStatus('${incident.id}', '${incident.status === 'open' ? 'resolved' : 'open'}')">${incident.status === 'open' ? 'Mark Resolved' : 'Mark Open'}</button>
@@ -655,8 +658,13 @@
         </section>
 
         <section class="panel section">
+          <div class="label">Autonomous Run</div>
+          <div style="margin-top: 12px;">${renderAutonomousRun(incident.autonomous_run)}</div>
+        </section>
+
+        <section class="panel section">
           <div class="label">Evidence Explanation</div>
-          <pre id="explanation" style="margin-top: 12px;">${escapeHtml(incident.cached_explanation || 'Click Explain Incident to generate and store an explanation in Supabase.')}</pre>
+          <pre id="explanation" style="margin-top: 12px;">${escapeHtml(incident.cached_explanation || 'Generated automatically for new deploy events. Use Regenerate Explanation for older records.')}</pre>
         </section>
 
         <section class="panel section">
@@ -707,7 +715,7 @@
 
     function renderAgentReport(report) {
       if (!report) {
-        return '<div class="empty">Run the triage agent to create a stored, evidence-bounded recommendation for this incident.</div>';
+        return '<div class="empty">New deploy events create this automatically. Re-run the triage agent for older records.</div>';
       }
       return `
         <div class="signal-grid">
@@ -720,6 +728,19 @@
           <div class="agent-item"><strong>Evidence Used</strong>${escapeHtml(report.evidence_used.join('\\n'))}</div>
           <div class="agent-item"><strong>Next Checks</strong>${escapeHtml(report.next_checks.join('\\n'))}</div>
           <div class="agent-item"><strong>Limitations</strong>${escapeHtml(report.limitations.join('\\n'))}</div>
+        </div>
+      `;
+    }
+
+    function renderAutonomousRun(run) {
+      if (!run) {
+        return '<div class="empty">Older incident record. Trigger a new production deploy event to see the autonomous flow.</div>';
+      }
+      return `
+        <div class="agent-list">
+          <div class="agent-item"><strong>Mode</strong>${escapeHtml(run.mode)} · completed ${escapeHtml(formatTime(run.completed_at))}</div>
+          <div class="agent-item"><strong>Actions Taken</strong>${escapeHtml(run.actions.join('\\n'))}</div>
+          <div class="agent-item"><strong>Guardrails</strong>${escapeHtml(run.guardrails.join('\\n'))}</div>
         </div>
       `;
     }
