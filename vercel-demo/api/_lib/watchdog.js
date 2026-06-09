@@ -88,15 +88,18 @@ function normalizeSignature(service, message) {
 
 function createScenarioIncident(scenario = 'checkout-timeout') {
   const now = Date.now();
-  const deployId = `demo-${now}`;
-  const environment = scenario === 'payments-latency' ? 'payments' : 'checkout';
+  const patch = 20 + (Math.floor(now / 1000) % 70);
+  const deployId = `v3.2.${patch}`;
+  const previousDeployId = `v3.2.${patch - 1}`;
+  const environment = 'production';
   const deployAt = new Date(now + 31_000);
   const detectedAt = new Date(now + 35_000);
   const isPayments = scenario === 'payments-latency';
+  const service = isPayments ? 'payments-api' : 'checkout-api';
   const rawMessage = isPayments
-    ? 'Payment provider timeout while authorizing card 4242 request 8f91ab22'
-    : 'Database timeout while loading checkout session user 123 request 8f91ab22';
-  const signature = normalizeSignature('api', rawMessage);
+    ? 'Payment provider timeout while authorizing card 4242 request 8f91ab22 after release v3.2'
+    : 'Database timeout while loading checkout session user 123 request 8f91ab22 after release v3.2';
+  const signature = normalizeSignature(service, rawMessage);
   const baselineErrorRate = 0.012;
   const detectedErrorRate = isPayments ? 0.051 : 0.128;
   const baselineLatencyMs = 117.7;
@@ -123,18 +126,19 @@ function createScenarioIncident(scenario = 'checkout-timeout') {
       request_rate_at_detection: 405.0,
     },
     timeline: [
-      { label: 'Deploy started', timestamp: deployAt.toISOString(), detail: `${deployId} deployed to ${environment}` },
+      { label: 'Previous release stable', timestamp: new Date(now - 10 * 60_000).toISOString(), detail: `${previousDeployId} held baseline at ${(baselineErrorRate * 100).toFixed(1)}% errors and ${baselineLatencyMs.toFixed(1)}ms p95` },
+      { label: 'Production deploy started', timestamp: deployAt.toISOString(), detail: `${deployId} promoted to ${environment} for ${service}` },
       { label: 'First dominant error', timestamp: detectedAt.toISOString(), detail: signature },
-      { label: 'Regression detected', timestamp: detectedAt.toISOString(), detail: reason },
+      { label: 'Regression detected', timestamp: detectedAt.toISOString(), detail: `${deployId} crossed the release guardrail: ${reason}` },
     ],
   };
   return {
     id,
     created_at: new Date().toISOString(),
     severity: 'high',
-    summary: `${deployId} regression in ${environment} with dominant error '${signature}'`,
+    summary: `${deployId} regressed ${service} in production after ${previousDeployId} baseline`,
     verdict,
-    alert_text: `watchdog detected a deployment regression: deploy ${deployId} triggered ${reason} 4s later. error rate delta: ${verdict.error_rate_delta.toFixed(3)}, latency delta: ${verdict.latency_delta_ms.toFixed(1)}ms. Dominant new error after deploy: '${signature}' seen 1 times.`,
+    alert_text: `watchdog detected a production deployment regression: ${deployId} replaced stable ${previousDeployId} and triggered ${reason} 4s later. error rate moved from ${(baselineErrorRate * 100).toFixed(1)}% to ${(detectedErrorRate * 100).toFixed(1)}%; p95 latency moved from ${baselineLatencyMs.toFixed(1)}ms to ${detectedLatencyMs.toFixed(1)}ms. Dominant new error after deploy: '${signature}' seen 1 times.`,
     cached_explanation: null,
     cached_explanation_updated_at: null,
     status: 'open',
