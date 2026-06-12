@@ -2,20 +2,47 @@
 
 WatchDog has two deployment tracks:
 
-- `vercel-demo/`: static GTM preview for Vercel.
+- `vercel-demo/`: hosted Vercel product demo with serverless APIs and Supabase persistence.
 - Root Docker image: live Rust dashboard service for Render, Railway, Fly.io, or any Docker host.
 
-Use the Vercel preview as the easy public product overview. Use the Docker service when you want the hosted app to behave end to end with backend-generated incidents, saved notes, status updates, cached explanations, exports, health checks, and Supabase or SQLite persistence.
+Use the Vercel app as the easy public interview demo. It behaves end to end with backend-generated incidents, saved notes, status updates, cached explanations, agent reports, health checks, and Supabase persistence. Use the Docker service when you want to run the Rust dashboard service itself.
 
-## Vercel static preview
+## Vercel hosted demo
 
-Deploy the static demo page:
+Deploy from the `vercel-demo/` directory:
 
 ```bash
 npx vercel deploy vercel-demo -y
 ```
 
-This is the best lightweight public demo link. It does not run the Rust daemon; it presents the product story, incident narrative, evidence, Slack alert, and workflow in a Vercel-friendly static page.
+Recommended project settings:
+
+- Framework preset: Other
+- Root directory: `vercel-demo`
+- Build command: leave empty
+- Output directory: leave empty
+
+Required environment variables:
+
+```bash
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+Do not put the service role key in client-side variables such as `NEXT_PUBLIC_*`. The Vercel frontend calls local serverless routes, and only those routes talk to Supabase.
+
+Hosted endpoints:
+
+- `GET /api/healthz`: confirms API and Supabase connectivity
+- `GET /api/incidents`: returns incident history for the dashboard
+- `GET /api/incidents/:id`: returns one persisted incident
+- `POST /api/deployments/start`: accepts a deploy event, detects the regression, generates the explanation, runs the triage agent, and stores the incident
+- `POST /api/incidents/:id/agent`: re-runs the evidence-bounded triage agent for an existing record
+- `POST /api/incidents/:id/explain`: regenerates the evidence explanation
+- `POST /api/incidents/:id/notes`: saves investigation notes
+- `POST /api/incidents/:id/status`: updates incident status
+
+The hosted demo does not run a long-lived Rust daemon. It uses Vercel serverless APIs for the public product workflow and Supabase as the durable database. The demo deploy/telemetry source is generated, while persistence, status, notes, explanations, and agent reports are real backend writes.
 
 ## Docker dashboard service
 
@@ -83,7 +110,7 @@ With Supabase storage, Railway does not need a volume for incident history.
 
 ## Demo database
 
-The cloud demo can use Supabase Postgres through the Supabase REST API:
+The cloud demo uses Supabase Postgres through the Supabase REST API:
 
 ```bash
 WATCHDOG_STORAGE=supabase
