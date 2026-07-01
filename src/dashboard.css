@@ -494,7 +494,12 @@
       background: rgba(255, 255, 255, 0.94);
       color: var(--ink);
       box-shadow: var(--shadow-sm);
-      transition: border-color 160ms ease, background 220ms ease, color 220ms ease;
+      transition:
+        border-color var(--motion-fast) ease,
+        background var(--motion-medium) ease,
+        color var(--motion-medium) ease,
+        box-shadow var(--motion-fast) ease,
+        transform var(--motion-fast) var(--ease-standard);
     }
 
     .control-input::placeholder {
@@ -505,6 +510,8 @@
       outline: 3px solid var(--focus);
       outline-offset: 2px;
       border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft), var(--shadow-sm);
+      transform: translateY(-1px);
     }
 
     html[data-theme="dark"] .control-input {
@@ -615,7 +622,11 @@
       padding: 16px;
       cursor: pointer;
       text-align: left;
-      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+      transition:
+        transform var(--motion-fast) var(--ease-standard),
+        border-color var(--motion-fast) ease,
+        background var(--motion-fast) ease,
+        box-shadow var(--motion-fast) ease;
       background: linear-gradient(180deg, #ffffff, #f6fafc);
       border-left: 4px solid transparent;
     }
@@ -631,6 +642,10 @@
       background: linear-gradient(180deg, #eaf8f6, #ffffff);
       box-shadow: 0 18px 32px rgba(47, 91, 234, 0.12);
       border-left-color: var(--accent);
+    }
+
+    .incident-card:active {
+      transform: translateY(0) scale(0.998);
     }
 
     html[data-theme="dark"] .incident-card:hover,
@@ -746,7 +761,14 @@
       cursor: pointer;
       font-weight: 600;
       text-decoration: none;
-      transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease, color 220ms ease;
+      position: relative;
+      overflow: hidden;
+      transition:
+        transform var(--motion-fast) var(--ease-standard),
+        border-color var(--motion-fast) ease,
+        background var(--motion-fast) ease,
+        box-shadow var(--motion-fast) ease,
+        color var(--motion-medium) ease;
     }
 
     .button:hover,
@@ -754,11 +776,20 @@
       transform: translateY(-1px);
     }
 
+    .button:active,
+    .refresh-link:active {
+      transform: translateY(0) scale(0.99);
+    }
+
     .button-primary {
       color: white;
       min-width: 170px;
       background: linear-gradient(135deg, #111827, #26364b);
       box-shadow: 0 14px 24px rgba(17, 24, 39, 0.16);
+    }
+
+    .button-primary:hover {
+      box-shadow: 0 18px 30px rgba(17, 24, 39, 0.2);
     }
 
     html[data-theme="dark"] .button-primary {
@@ -776,6 +807,12 @@
       background: rgba(255, 255, 255, 0.9);
       color: var(--ink);
       border-color: var(--line-strong);
+    }
+
+    .button-secondary:hover,
+    .refresh-link:hover {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-sm);
     }
 
     html[data-theme="dark"] .button-secondary,
