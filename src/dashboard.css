@@ -20,6 +20,11 @@
       --shadow-md: 0 14px 34px rgba(17, 24, 39, 0.08);
       --shadow-sm: 0 8px 20px rgba(17, 24, 39, 0.06);
       --focus: #2f5bea;
+      --motion-fast: 150ms;
+      --motion-medium: 240ms;
+      --motion-slow: 560ms;
+      --ease-standard: cubic-bezier(.2,.7,.2,1);
+      --ease-press: cubic-bezier(.2,0,.2,1);
       --radius-xl: 14px;
       --radius-lg: 12px;
       --radius-md: 10px;
@@ -66,7 +71,7 @@
         linear-gradient(145deg, transparent 0%, rgba(183, 121, 31, 0.06) 78%, rgba(183, 121, 31, 0.1) 100%),
         linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
       overflow-x: hidden;
-      transition: background 220ms ease, color 220ms ease;
+      transition: background var(--motion-medium) ease, color var(--motion-medium) ease;
     }
 
     html[data-theme="dark"] body {
@@ -85,7 +90,7 @@
         linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.34) 45%, transparent 70%),
         radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.55), transparent 28%);
       opacity: 0.72;
-      transition: opacity 220ms ease;
+      transition: opacity var(--motion-medium) ease;
     }
 
     html[data-theme="dark"] body::before {
@@ -125,7 +130,10 @@
       background: var(--surface);
       backdrop-filter: blur(14px);
       box-shadow: var(--shadow-lg);
-      transition: background 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+      transition:
+        background var(--motion-medium) ease,
+        border-color var(--motion-medium) ease,
+        box-shadow var(--motion-medium) ease;
     }
 
     .panel::before {
@@ -220,6 +228,16 @@
       border-radius: var(--radius-md);
       background: var(--surface-strong);
       box-shadow: var(--shadow-sm);
+      transition:
+        transform var(--motion-fast) var(--ease-standard),
+        border-color var(--motion-fast) ease,
+        box-shadow var(--motion-fast) ease;
+    }
+
+    .product-step:hover {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
+      box-shadow: var(--shadow-md);
     }
 
     .step-index {
@@ -249,6 +267,16 @@
       border-radius: var(--radius-lg);
       background: var(--surface-strong);
       box-shadow: var(--shadow-sm);
+      transition:
+        transform var(--motion-fast) var(--ease-standard),
+        border-color var(--motion-fast) ease,
+        box-shadow var(--motion-fast) ease;
+    }
+
+    .scenario-card:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-md);
     }
 
     .scenario-actions {
