@@ -13,6 +13,7 @@
     let loadIncidentsInFlight = null;
     let refreshDelayMs = 5000;
     let toastSequence = 0;
+    let highlightedIncidentIds = new Set();
     const THEME_KEY = 'watchdog-theme';
     const NOTIFICATION_PREF_KEY = 'watchdog-browser-alerts';
     const NOTIFIED_INCIDENTS_KEY = 'watchdog-notified-incidents';
@@ -99,6 +100,9 @@
           }
           incidents = await response.json();
           knownIncidentIds = new Set(incidents.map((incident) => incident.id));
+          highlightedIncidentIds = previousIncidentIds.size > 0
+            ? new Set(incidents.filter((incident) => !previousIncidentIds.has(incident.id)).map((incident) => incident.id))
+            : new Set();
           lastSyncedAt = new Date();
           refreshDelayMs = BASE_REFRESH_INTERVAL_MS;
           await loadHealth();
@@ -109,6 +113,7 @@
 
           if (previousIncidentIds.size > 0) {
             notifyOnNewIncidents(previousIncidentIds, incidents);
+            clearIncidentHighlightsAfterDelay();
           }
 
           if (incidents.length) {
@@ -141,6 +146,17 @@
 
     function setSyncBusy(isBusy) {
       document.getElementById('sync-state')?.classList.toggle('busy', isBusy);
+    }
+
+    function clearIncidentHighlightsAfterDelay() {
+      if (!highlightedIncidentIds.size) {
+        return;
+      }
+
+      window.setTimeout(() => {
+        highlightedIncidentIds = new Set();
+        renderIncidentList();
+      }, prefersReducedMotion ? 0 : 3600);
     }
 
     function applySavedTheme() {
@@ -718,9 +734,10 @@
     function renderIncidentCard(incident, index) {
       const isActive = incident.id === activeIncidentId;
       const delayClass = `reveal-delay-${Math.min((index % 3) + 1, 3)}`;
+      const isNew = highlightedIncidentIds.has(incident.id);
       return `
         <article
-          class="incident-card reveal ${delayClass} ${isActive ? 'active in-view' : ''}"
+          class="incident-card reveal ${delayClass} ${isActive ? 'active in-view' : ''} ${isNew ? 'new' : ''}"
           onclick="selectIncident('${incident.id}')"
           onkeydown="handleIncidentKey(event, '${incident.id}')"
           tabindex="0"
