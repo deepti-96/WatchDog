@@ -85,6 +85,7 @@
       }
 
       const { silent = false } = options;
+      setSyncBusy(true);
       if (!silent) {
         renderIncidentListLoading();
       }
@@ -130,11 +131,16 @@
             renderErrorDetail(error);
           }
         } finally {
+          setSyncBusy(false);
           loadIncidentsInFlight = null;
         }
       })();
 
       return loadIncidentsInFlight;
+    }
+
+    function setSyncBusy(isBusy) {
+      document.getElementById('sync-state')?.classList.toggle('busy', isBusy);
     }
 
     function applySavedTheme() {
