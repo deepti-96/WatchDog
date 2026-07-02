@@ -1071,6 +1071,15 @@
       color: var(--ink);
       resize: vertical;
       box-shadow: var(--shadow-sm);
+      transition:
+        border-color var(--motion-fast) ease,
+        box-shadow var(--motion-fast) ease,
+        background var(--motion-medium) ease;
+    }
+
+    .notes-box.has-draft {
+      border-color: var(--warning);
+      box-shadow: 0 0 0 4px var(--warning-soft), var(--shadow-sm);
     }
 
     html[data-theme="dark"] .notes-box {
@@ -1083,6 +1092,11 @@
       gap: 12px;
       align-items: center;
       margin-top: 12px;
+    }
+
+    #notes-draft-status.has-draft {
+      color: var(--warning);
+      font-weight: 700;
     }
 
     .timeline {

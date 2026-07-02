@@ -1099,10 +1099,18 @@
         return;
       }
 
+      updateNotesDraftState(textarea, status, incident);
       textarea.addEventListener('input', () => {
         persistNotesDraft(incident.id, textarea.value);
-        status.textContent = renderNotesDraftStatus({ ...incident, notes: incident.notes });
+        updateNotesDraftState(textarea, status, incident);
       });
+    }
+
+    function updateNotesDraftState(textarea, status, incident) {
+      const hasDraft = Boolean(readNotesDraft(incident.id)) && textarea.value !== incident.notes;
+      textarea.classList.toggle('has-draft', hasDraft);
+      status.classList.toggle('has-draft', hasDraft);
+      status.textContent = renderNotesDraftStatus({ ...incident, notes: incident.notes });
     }
 
     async function copyIncidentLink(id) {
