@@ -478,6 +478,15 @@
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
       background: rgba(255, 255, 255, 0.82);
+      transition:
+        transform var(--motion-fast) var(--ease-standard),
+        border-color var(--motion-fast) ease,
+        background var(--motion-medium) ease;
+    }
+
+    .health-chip:hover {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
     }
 
     html[data-theme="dark"] .health-chip {
@@ -670,6 +679,10 @@
     html[data-theme="dark"] .incident-card:hover,
     html[data-theme="dark"] .incident-card.active {
       background: linear-gradient(180deg, rgba(20, 58, 58, 0.9), rgba(18, 43, 46, 0.92));
+    }
+
+    html[data-theme="dark"] .incident-card.new {
+      background: linear-gradient(180deg, rgba(77, 56, 18, 0.74), rgba(31, 37, 44, 0.92));
     }
 
     .incident-card-head {
@@ -1009,6 +1022,15 @@
       border-radius: var(--radius-md);
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.72);
+      transition:
+        transform var(--motion-fast) var(--ease-standard),
+        border-color var(--motion-fast) ease,
+        background var(--motion-medium) ease;
+    }
+
+    .operator-item:hover {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
     }
 
     html[data-theme="dark"] .operator-item {
@@ -1042,6 +1064,7 @@
       padding: 12px 14px;
       border-top: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.72);
+      transition: background var(--motion-fast) ease;
     }
 
     .evidence-row:first-child {
@@ -1050,6 +1073,10 @@
 
     html[data-theme="dark"] .evidence-row {
       background: rgba(255, 255, 255, 0.05);
+    }
+
+    .evidence-row:hover {
+      background: rgba(47, 91, 234, 0.07);
     }
 
     .callout,
@@ -1442,4 +1469,9 @@
       .timeline-item { grid-template-columns: 1fr; }
       .timeline-time, .timeline-content { padding-left: 18px; }
       .sidebar-head { align-items: center; }
+      .toast-stack {
+        right: 9px;
+        bottom: 9px;
+        width: calc(100vw - 18px);
+      }
     }
