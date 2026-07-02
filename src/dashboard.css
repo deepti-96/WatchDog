@@ -167,6 +167,10 @@
       padding: 28px;
     }
 
+    .detail-updating {
+      animation: detail-swap var(--motion-medium) var(--ease-standard);
+    }
+
     .eyebrow {
       display: inline-flex;
       align-items: center;
@@ -1294,6 +1298,17 @@
       0% { transform: translateY(0) scale(1); }
       42% { transform: translateY(-1px) scale(1.08); color: var(--accent-strong); }
       100% { transform: translateY(0) scale(1); }
+    }
+
+    @keyframes detail-swap {
+      from {
+        opacity: 0.68;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @keyframes shell-enter {

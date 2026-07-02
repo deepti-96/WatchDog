@@ -838,23 +838,23 @@
     }
 
     function renderEmptyDetail() {
-      document.getElementById('detail-panel').innerHTML = `
+      setDetailPanelHtml(`
         <div class="empty reveal in-view">
           No incidents yet. Run a hosted scenario from the sidebar or connect the daemon to metrics and deploy events to create the first saved regression record.
         </div>
-      `;
+      `);
     }
 
     function renderFilteredEmptyDetail() {
-      document.getElementById('detail-panel').innerHTML = `
+      setDetailPanelHtml(`
         <div class="empty reveal in-view">
           No incident matches the current URL state. Adjust the triage controls or clear the filters to choose another incident.
         </div>
-      `;
+      `);
     }
 
     function renderDetailLoading() {
-      document.getElementById('detail-panel').innerHTML = `
+      setDetailPanelHtml(`
         <div class="loading-state" aria-label="Loading incident details">
           <div class="skeleton hero reveal in-view"></div>
           <div class="overview-grid">
@@ -868,19 +868,31 @@
             <div class="skeleton panel-block reveal in-view"></div>
           </div>
         </div>
-      `;
+      `);
     }
 
     function renderErrorDetail(error) {
-      document.getElementById('detail-panel').innerHTML = `
+      setDetailPanelHtml(`
         <div class="empty reveal in-view">
           Could not load this incident. ${escapeHtml(error.message || String(error))}
         </div>
-      `;
+      `);
+    }
+
+    function setDetailPanelHtml(html) {
+      const panel = document.getElementById('detail-panel');
+      if (!panel) {
+        return;
+      }
+
+      if (!prefersReducedMotion) {
+        panel.classList.add('detail-updating');
+      }
+      panel.innerHTML = html;
+      requestAnimationFrame(() => panel.classList.remove('detail-updating'));
     }
 
     function renderDetail(incident, explanation, loading, explanationError) {
-      const panel = document.getElementById('detail-panel');
       const verdict = incident.verdict;
       const comparison = verdict.comparison;
       const signature = verdict.top_error_signature || 'No dominant error signature captured';
@@ -894,7 +906,7 @@
         ? `Cached ${new Date(incident.cached_explanation_updated_at).toLocaleString()}`
         : 'Generated on demand';
 
-      panel.innerHTML = `
+      setDetailPanelHtml(`
         <section class="hero reveal in-view">
           <div class="hero-copy">
             <div class="badge-row">
@@ -1035,8 +1047,9 @@
             </article>
           </div>
         </section>
-      `;
+      `);
 
+      const panel = document.getElementById('detail-panel');
       activateReveals(panel);
       bindNotesDraft(incident);
     }
