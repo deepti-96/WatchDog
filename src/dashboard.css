@@ -582,6 +582,10 @@
       overflow-wrap: anywhere;
     }
 
+    .metric-bump {
+      animation: metric-bump 520ms var(--ease-standard);
+    }
+
     .label {
       color: var(--muted);
       text-transform: uppercase;
@@ -1284,6 +1288,12 @@
       100% {
         box-shadow: var(--shadow-sm);
       }
+    }
+
+    @keyframes metric-bump {
+      0% { transform: translateY(0) scale(1); }
+      42% { transform: translateY(-1px) scale(1.08); color: var(--accent-strong); }
+      100% { transform: translateY(0) scale(1); }
     }
 
     @keyframes shell-enter {

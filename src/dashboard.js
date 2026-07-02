@@ -671,10 +671,31 @@
     }
 
     function renderSidebarStats() {
-      document.getElementById('incident-count').textContent = incidents.length;
-      document.getElementById('open-count').textContent = incidents.filter((incident) => incident.status === 'open').length;
-      document.getElementById('high-count').textContent = incidents.filter((incident) => incident.severity === 'high').length;
-      document.getElementById('cached-count').textContent = incidents.filter((incident) => incident.has_cached_explanation).length;
+      updateMetricText('incident-count', incidents.length);
+      updateMetricText('open-count', incidents.filter((incident) => incident.status === 'open').length);
+      updateMetricText('high-count', incidents.filter((incident) => incident.severity === 'high').length);
+      updateMetricText('cached-count', incidents.filter((incident) => incident.has_cached_explanation).length);
+    }
+
+    function updateMetricText(id, value) {
+      const element = document.getElementById(id);
+      if (!element) {
+        return;
+      }
+
+      const nextValue = String(value);
+      if (element.textContent === nextValue) {
+        return;
+      }
+
+      element.textContent = nextValue;
+      if (prefersReducedMotion) {
+        return;
+      }
+
+      element.classList.remove('metric-bump');
+      void element.offsetWidth;
+      element.classList.add('metric-bump');
     }
 
     function renderSystemHealth() {
