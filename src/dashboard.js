@@ -1369,7 +1369,7 @@
           <line class="compare-chart-grid" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}"></line>
           <line class="compare-chart-grid" x1="${left}" y1="${top}" x2="${right}" y2="${top}"></line>
           <polygon class="compare-chart-area" points="${areaPoints}"></polygon>
-          <polyline class="compare-chart-line" points="${linePoints.join(' ')}"></polyline>
+          <polyline class="compare-chart-line" pathLength="1" points="${linePoints.join(' ')}"></polyline>
           <circle class="compare-chart-dot" cx="${startX}" cy="${startY}" r="4.5"></circle>
           <circle class="compare-chart-dot" cx="${endX}" cy="${endY}" r="4.5"></circle>
           <text class="compare-chart-label" x="${left}" y="${height - 2}">baseline</text>
