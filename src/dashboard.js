@@ -919,11 +919,11 @@
             <p class="subhead">WatchDog flagged this release ${verdict.seconds_after_deploy}s after deploy. The backend detector compared post-deploy behavior against the saved baseline and persisted the strongest evidence for triage.</p>
           </div>
           <div class="hero-actions">
-            <button class="button button-primary" ${loading ? 'disabled' : ''} onclick="explainIncident('${incident.id}')">${loading ? 'Explaining…' : 'Explain Incident'}</button>
-            <button class="button button-secondary" ${loading ? 'disabled' : ''} onclick="regenerateExplanation('${incident.id}')">${loading ? 'Refreshing…' : 'Regenerate Explanation'}</button>
+            <button class="button button-primary" ${loading ? 'disabled' : ''} onclick="explainIncident('${incident.id}', this)">${loading ? 'Explaining…' : 'Explain Incident'}</button>
+            <button class="button button-secondary" ${loading ? 'disabled' : ''} onclick="regenerateExplanation('${incident.id}', this)">${loading ? 'Refreshing…' : 'Regenerate Explanation'}</button>
             <button class="button button-secondary" onclick="loadIncidents()">Refresh Incidents</button>
-            <button class="button button-secondary" onclick="copyIncidentLink('${incident.id}')">Copy Link</button>
-            <button class="button button-secondary" onclick="copyIncidentSummary('${incident.id}')">Copy Summary</button>
+            <button class="button button-secondary" onclick="copyIncidentLink('${incident.id}', this)">Copy Link</button>
+            <button class="button button-secondary" onclick="copyIncidentSummary('${incident.id}', this)">Copy Summary</button>
             <a class="refresh-link" href="/api/incidents/${encodeURIComponent(incident.id)}/export/markdown">Download Markdown</a>
             <a class="refresh-link" href="/api/incidents/${encodeURIComponent(incident.id)}/export/json">Download JSON</a>
           </div>
@@ -1021,8 +1021,8 @@
                 ${incident.notes.trim() ? renderBadge('subtle', 'Notes saved') : renderBadge('subtle', 'No notes yet')}
               </div>
               <div class="hero-actions" style="margin-top: 14px; justify-content: flex-start;">
-                <button class="button button-secondary" ${incident.status === 'open' ? 'disabled' : ''} onclick="setIncidentStatus('${incident.id}', 'open')">Mark Open</button>
-                <button class="button button-secondary" ${incident.status === 'resolved' ? 'disabled' : ''} onclick="setIncidentStatus('${incident.id}', 'resolved')">Mark Resolved</button>
+                <button class="button button-secondary" ${incident.status === 'open' ? 'disabled' : ''} onclick="setIncidentStatus('${incident.id}', 'open', this)">Mark Open</button>
+                <button class="button button-secondary" ${incident.status === 'resolved' ? 'disabled' : ''} onclick="setIncidentStatus('${incident.id}', 'resolved', this)">Mark Resolved</button>
               </div>
             </article>
 
@@ -1034,7 +1034,7 @@
               <textarea id="incident-notes" class="notes-box" placeholder="Capture what you found, what changed, and what to check next...">${escapeHtml(resolveIncidentNotesValue(incident))}</textarea>
               <div class="notes-actions">
                 <span id="notes-draft-status" class="muted">${escapeHtml(renderNotesDraftStatus(incident))}</span>
-                <button class="button button-secondary" onclick="saveIncidentNotes('${incident.id}')">Save Notes</button>
+                <button class="button button-secondary" onclick="saveIncidentNotes('${incident.id}', this)">Save Notes</button>
               </div>
             </article>
 
@@ -1113,7 +1113,8 @@
       status.textContent = renderNotesDraftStatus({ ...incident, notes: incident.notes });
     }
 
-    async function copyIncidentLink(id) {
+    async function copyIncidentLink(id, button = null) {
+      setActionPending(button, true);
       try {
         const url = new URL(window.location.href);
         url.hash = `incident=${encodeURIComponent(id)}`;
@@ -1127,10 +1128,13 @@
         showToast(link);
       } catch (error) {
         showToast(`Could not copy incident link. ${error.message || String(error)}`, 'warning');
+      } finally {
+        setActionPending(button, false);
       }
     }
 
-    async function copyIncidentSummary(id) {
+    async function copyIncidentSummary(id, button = null) {
+      setActionPending(button, true);
       try {
         const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/summary`);
         if (!response.ok) {
@@ -1147,11 +1151,14 @@
         showToast(summary);
       } catch (error) {
         showToast(`Could not copy incident summary. ${error.message || String(error)}`, 'warning');
+      } finally {
+        setActionPending(button, false);
       }
     }
 
-    async function setIncidentStatus(id, status) {
+    async function setIncidentStatus(id, status, button = null) {
       const requestVersion = detailRequestVersion;
+      setActionPending(button, true);
       try {
         const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/status`, {
           method: 'POST',
@@ -1173,12 +1180,15 @@
         showToast(`Incident marked ${status}.`);
       } catch (error) {
         showToast(`Could not update incident status. ${error.message || String(error)}`, 'warning');
+      } finally {
+        setActionPending(button, false);
       }
     }
 
-    async function saveIncidentNotes(id) {
+    async function saveIncidentNotes(id, button = null) {
       const requestVersion = detailRequestVersion;
       const notes = document.getElementById('incident-notes')?.value || '';
+      setActionPending(button, true);
       try {
         const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/notes`, {
           method: 'POST',
@@ -1200,13 +1210,16 @@
         showToast('Investigation notes saved.');
       } catch (error) {
         showToast(`Could not save notes. ${error.message || String(error)}`, 'warning');
+      } finally {
+        setActionPending(button, false);
       }
     }
 
-    async function regenerateExplanation(id) {
+    async function regenerateExplanation(id, button = null) {
       let incident;
       const requestVersion = detailRequestVersion;
       isExplainingIncident = true;
+      setActionPending(button, true);
       try {
         const incidentResponse = await fetch(`/api/incidents/${encodeURIComponent(id)}`);
         if (!incidentResponse.ok) {
@@ -1241,13 +1254,15 @@
         }
       } finally {
         isExplainingIncident = false;
+        setActionPending(button, false);
       }
     }
 
-    async function explainIncident(id) {
+    async function explainIncident(id, button = null) {
       let incident;
       const requestVersion = detailRequestVersion;
       isExplainingIncident = true;
+      setActionPending(button, true);
       try {
         const incidentResponse = await fetch(`/api/incidents/${encodeURIComponent(id)}`);
         if (!incidentResponse.ok) {
@@ -1281,7 +1296,18 @@
         }
       } finally {
         isExplainingIncident = false;
+        setActionPending(button, false);
       }
+    }
+
+    function setActionPending(button, isPending) {
+      if (!button) {
+        return;
+      }
+
+      button.classList.toggle('is-pending', isPending);
+      button.disabled = isPending;
+      button.setAttribute('aria-busy', String(isPending));
     }
 
     function renderBadge(kind, label) {

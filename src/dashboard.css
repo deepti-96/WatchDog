@@ -822,6 +822,24 @@
       transform: none;
     }
 
+    .button.is-pending {
+      cursor: wait;
+      opacity: 0.82;
+    }
+
+    .button.is-pending::after {
+      content: "";
+      display: inline-block;
+      width: 0.8em;
+      height: 0.8em;
+      margin-left: 8px;
+      border-radius: 999px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      vertical-align: -0.12em;
+      animation: spin 720ms linear infinite;
+    }
+
     .button-secondary {
       background: rgba(255, 255, 255, 0.9);
       color: var(--ink);
@@ -1351,6 +1369,10 @@
         opacity: 1;
         transform: scale(1);
       }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     @keyframes shell-enter {
