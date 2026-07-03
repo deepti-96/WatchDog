@@ -97,19 +97,18 @@ async fn index() -> Html<&'static str> {
 }
 
 async fn dashboard_css() -> Response {
-    let mut response = DASHBOARD_CSS.into_response();
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        header::HeaderValue::from_static("text/css; charset=utf-8"),
-    );
-    response
+    static_asset_response(DASHBOARD_CSS, "text/css; charset=utf-8")
 }
 
 async fn dashboard_js() -> Response {
-    let mut response = DASHBOARD_JS.into_response();
+    static_asset_response(DASHBOARD_JS, "application/javascript; charset=utf-8")
+}
+
+fn static_asset_response(body: &'static str, content_type: &'static str) -> Response {
+    let mut response = body.into_response();
     response.headers_mut().insert(
         header::CONTENT_TYPE,
-        header::HeaderValue::from_static("application/javascript; charset=utf-8"),
+        header::HeaderValue::from_static(content_type),
     );
     response
 }
