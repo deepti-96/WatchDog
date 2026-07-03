@@ -73,7 +73,7 @@ Open `http://127.0.0.1:3001`, then use the dashboard to:
 - Add investigation notes and mark the incident resolved
 - Export Markdown or JSON for handoff
 
-For hosted demos, see [`deploy/README.md`](./deploy/README.md):
+For hosted demos, see [`docs/deployment.md`](./docs/deployment.md):
 
 - Vercel hosted product demo from `vercel-demo/` with serverless APIs and Supabase persistence
 - Dockerized Rust dashboard for Render, Railway, Fly.io, or any Docker host
