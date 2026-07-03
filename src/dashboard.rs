@@ -65,6 +65,7 @@ pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Resul
     let app = Router::new()
         .route("/", get(index))
         .route("/assets/dashboard.css", get(dashboard_css))
+        .route("/assets/dashboard.js", get(dashboard_js))
         .route("/healthz", get(healthz))
         .route("/api/incidents", get(list_incidents))
         .route("/api/demo/scenarios", post(create_demo_scenario))
@@ -100,6 +101,15 @@ async fn dashboard_css() -> Response {
     response.headers_mut().insert(
         header::CONTENT_TYPE,
         header::HeaderValue::from_static("text/css; charset=utf-8"),
+    );
+    response
+}
+
+async fn dashboard_js() -> Response {
+    let mut response = DASHBOARD_JS.into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("application/javascript; charset=utf-8"),
     );
     response
 }
@@ -394,3 +404,4 @@ fn run_demo_scenario(state_dir: &std::path::Path, scenario: &str) -> anyhow::Res
 
 const INDEX_HTML: &str = include_str!("dashboard.html");
 const DASHBOARD_CSS: &str = include_str!("dashboard.css");
+const DASHBOARD_JS: &str = include_str!("dashboard.js");
