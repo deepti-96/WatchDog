@@ -1,5 +1,14 @@
 target/
 .watchdog/
 .watchdog-demo/
+venv/
+.venv/
+.vercel/
+vercel-demo/.vercel/
+demo-video/
 *.log
+*.sqlite
+.env
+.env.*
+!.env.example
 .DS_Store

@@ -1,7 +1,14 @@
 .git
+.DS_Store
+.env
+.env.*
 .watchdog
 .watchdog-demo
+*.log
+*.sqlite
 target
 venv
+.venv
+.vercel
 vercel-demo/.vercel
 demo-video
