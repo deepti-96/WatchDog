@@ -218,6 +218,48 @@ function buildAgentReport(incident) {
   };
 }
 
+function buildRollbackBrief(incident) {
+  const verdict = incident.verdict;
+  const comparison = verdict.comparison;
+  const errorMultiplier = comparison.baseline_error_rate > 0
+    ? comparison.detected_error_rate / comparison.baseline_error_rate
+    : 0;
+  const latencyMultiplier = comparison.baseline_latency_ms > 0
+    ? comparison.detected_latency_ms / comparison.baseline_latency_ms
+    : 0;
+  const rollbackRecommended = verdict.error_rate_delta >= 0.08
+    || verdict.latency_delta_ms >= 200
+    || errorMultiplier >= 5
+    || latencyMultiplier >= 2;
+
+  return {
+    generated_at: new Date().toISOString(),
+    decision: rollbackRecommended ? 'rollback recommended' : 'hold and monitor',
+    owner: verdict.top_error_signature?.split(':')[0] || 'service owner',
+    blast_radius: `${verdict.environment} traffic at ${comparison.request_rate_at_detection.toFixed(1)} req/s`,
+    customer_risk: rollbackRecommended
+      ? 'Customer-facing risk is likely because the new release crossed latency or error-rate guardrails shortly after deploy.'
+      : 'Customer-facing risk is possible but below the automatic rollback recommendation threshold.',
+    rollback_trigger: [
+      `error rate ${comparison.detected_error_rate.toFixed(3)} vs baseline ${comparison.baseline_error_rate.toFixed(3)} (${errorMultiplier.toFixed(1)}x)`,
+      `p95 latency ${comparison.detected_latency_ms.toFixed(1)}ms vs baseline ${comparison.baseline_latency_ms.toFixed(1)}ms (${latencyMultiplier.toFixed(1)}x)`,
+      `dominant new signature: ${verdict.top_error_signature || 'none captured'}`,
+    ],
+    operator_steps: rollbackRecommended
+      ? [
+        `Pause rollout for ${verdict.deploy_id}.`,
+        'Notify the owning service channel with the incident link.',
+        'Roll back to the previous stable release if the signal is still elevated.',
+        'Keep WatchDog open until metrics return to baseline.',
+      ]
+      : [
+        'Keep the release under elevated watch.',
+        'Ask the owning service to inspect traces around the first post-deploy error.',
+        'Escalate to rollback if the next monitoring window worsens.',
+      ],
+  };
+}
+
 function autonomouslyTriageIncident(incident) {
   const triaged = {
     ...incident,
@@ -226,6 +268,8 @@ function autonomouslyTriageIncident(incident) {
   };
   triaged.agent_report = buildAgentReport(triaged);
   triaged.agent_report_updated_at = new Date().toISOString();
+  triaged.rollback_brief = buildRollbackBrief(triaged);
+  triaged.rollback_brief_updated_at = new Date().toISOString();
   triaged.autonomous_run = {
     mode: 'deploy-webhook',
     completed_at: new Date().toISOString(),
@@ -235,6 +279,7 @@ function autonomouslyTriageIncident(incident) {
       'opened incident after guardrail breach',
       'generated evidence explanation',
       'generated triage recommendation',
+      'prepared rollback decision brief',
       'persisted audit trail to Supabase',
     ],
     guardrails: [
@@ -259,6 +304,7 @@ function sendError(res, error) {
 module.exports = {
   autonomouslyTriageIncident,
   buildAgentReport,
+  buildRollbackBrief,
   createScenarioIncident,
   explainIncident,
   listIncidents,

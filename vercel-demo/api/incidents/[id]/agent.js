@@ -1,4 +1,4 @@
-const { buildAgentReport, readIncident, sendError, sendJson, writeIncident } = require('../../_lib/watchdog');
+const { buildAgentReport, buildRollbackBrief, readIncident, sendError, sendJson, writeIncident } = require('../../_lib/watchdog');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,8 +14,10 @@ module.exports = async function handler(req, res) {
     const agentReport = buildAgentReport(incident);
     incident.agent_report = agentReport;
     incident.agent_report_updated_at = new Date().toISOString();
+    incident.rollback_brief = buildRollbackBrief(incident);
+    incident.rollback_brief_updated_at = new Date().toISOString();
     await writeIncident(incident);
-    sendJson(res, 200, { agent_report: agentReport });
+    sendJson(res, 200, { agent_report: agentReport, rollback_brief: incident.rollback_brief });
   } catch (error) {
     sendError(res, error);
   }

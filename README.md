@@ -24,7 +24,7 @@ The intended user is an engineer, SRE, or engineering manager who needs to under
 - Attributes suspicious shifts and repeated new error signatures to a specific deploy
 - Persists incident records with status, notes, explanation cache, and export endpoints
 - Serves a product dashboard for incident review and deploy-event demos
-- Runs autonomous deploy triage in the hosted demo: detect, explain, recommend, and store the audit trail
+- Runs autonomous deploy triage in the hosted demo: detect, explain, recommend, prepare a rollback decision brief, and store the audit trail
 - Emits a human-readable verdict to stdout, webhook, and the dashboard
 
 ## Flow
@@ -190,12 +190,13 @@ flowchart LR
     C --> D["WatchDog deploy monitor<br/>baseline vs new release"]
     D --> E["Evidence explanation<br/>deterministic incident summary"]
     E --> F["Triage agent<br/>confidence, action, limits"]
-    F --> G["Supabase Postgres<br/>incidents.incident_json"]
-    G --> H["Dashboard detail<br/>history, notes, status, audit trail"]
-    H --> B
+    F --> G["Rollback decision brief<br/>risk, triggers, operator steps"]
+    G --> H["Supabase Postgres<br/>incidents.incident_json"]
+    H --> I["Dashboard detail<br/>history, notes, status, audit trail"]
+    I --> B
 ```
 
-The hosted demo is autonomous after the deploy event: it detects the regression, generates the explanation, runs the triage agent, and stores the incident in Supabase. It deliberately does not auto-rollback production; rollback remains a human-approved action.
+The hosted demo is autonomous after the deploy event: it detects the regression, generates the explanation, runs the triage agent, prepares a rollback decision brief, and stores the incident in Supabase. It deliberately does not auto-rollback production; rollback remains a human-approved action.
 
 ## Rust service architecture
 

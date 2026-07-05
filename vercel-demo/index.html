@@ -519,6 +519,7 @@
           ['Deploy', `${result.incident.verdict.deploy_id} is live in production`],
           ['Signal', result.incident.verdict.reason],
           ['Agent', 'Explanation and triage report generated'],
+          ['Rollback', result.incident.rollback_brief?.decision || 'Decision brief prepared'],
           ['Audit', 'Incident persisted to Supabase'],
         ]);
         activeIncidentId = result.incident_id;
@@ -607,6 +608,7 @@
               ${badge('deploy', verdict.environment)}
               ${badge('deploy', `deploy ${verdict.deploy_id}`)}
               ${incident.autonomous_run ? badge('deploy', 'autonomous triage') : ''}
+              ${incident.rollback_brief ? badge('deploy', incident.rollback_brief.decision) : ''}
             </div>
             <h2 style="margin-top: 14px;">${escapeHtml(incident.summary)}</h2>
             <p class="muted" style="margin-top: 12px;">WatchDog accepted the deploy event, compared the release against the previous stable baseline, generated the explanation and triage report, then persisted the incident in Supabase.</p>
@@ -670,6 +672,11 @@
         <section class="panel section">
           <div class="label">Triage Agent</div>
           <div id="agent-report" style="margin-top: 12px;">${renderAgentReport(incident.agent_report)}</div>
+        </section>
+
+        <section class="panel section">
+          <div class="label">Rollback Decision Brief</div>
+          <div style="margin-top: 12px;">${renderRollbackBrief(incident.rollback_brief)}</div>
         </section>
       `;
     }
@@ -741,6 +748,24 @@
           <div class="agent-item"><strong>Mode</strong>${escapeHtml(run.mode)} · completed ${escapeHtml(formatTime(run.completed_at))}</div>
           <div class="agent-item"><strong>Actions Taken</strong>${escapeHtml(run.actions.join('\\n'))}</div>
           <div class="agent-item"><strong>Guardrails</strong>${escapeHtml(run.guardrails.join('\\n'))}</div>
+        </div>
+      `;
+    }
+
+    function renderRollbackBrief(brief) {
+      if (!brief) {
+        return '<div class="empty">New deploy events create this automatically. Trigger a deploy event to prepare a rollback decision brief.</div>';
+      }
+      return `
+        <div class="signal-grid">
+          ${card('Decision', brief.decision, 'Human approval required before rollback')}
+          ${card('Owner', brief.owner, 'Service inferred from dominant signature')}
+          ${card('Blast Radius', brief.blast_radius, 'Traffic volume at detection')}
+        </div>
+        <div class="agent-list">
+          <div class="agent-item"><strong>Customer Risk</strong>${escapeHtml(brief.customer_risk)}</div>
+          <div class="agent-item"><strong>Rollback Triggers</strong>${escapeHtml(brief.rollback_trigger.join('\\n'))}</div>
+          <div class="agent-item"><strong>Operator Steps</strong>${escapeHtml(brief.operator_steps.join('\\n'))}</div>
         </div>
       `;
     }
