@@ -431,14 +431,33 @@ where
         *cursor = 0;
     }
 
-    for line in lines.iter().skip(*cursor) {
+    let mut consumed_lines = *cursor;
+    for (index, line) in lines.iter().enumerate().skip(*cursor) {
         if line.trim().is_empty() {
+            consumed_lines = index + 1;
             continue;
         }
-        out.push(serde_json::from_str(line)?);
+
+        match serde_json::from_str(line) {
+            Ok(record) => {
+                out.push(record);
+                consumed_lines = index + 1;
+            }
+            Err(error) if index + 1 == lines.len() => {
+                warn!(
+                    "leaving trailing partial JSONL record unread in {}: {error}",
+                    path.display()
+                );
+                break;
+            }
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("failed to parse JSONL line {}", index + 1));
+            }
+        }
     }
 
-    *cursor = lines.len();
+    *cursor = consumed_lines;
     Ok(out)
 }
 
@@ -501,6 +520,28 @@ mod tests {
             read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read replacement record");
         assert_eq!(records, vec![JsonlTestRecord { value: 9 }]);
         assert_eq!(cursor, 1);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn read_new_jsonl_leaves_trailing_partial_record_unread() {
+        let path = temp_path("partial-line");
+        fs::write(&path, "{\"value\":1}\n{\"value\":").expect("write partial jsonl");
+
+        let mut cursor = 0;
+        let records =
+            read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read complete records");
+
+        assert_eq!(records, vec![JsonlTestRecord { value: 1 }]);
+        assert_eq!(cursor, 1);
+
+        fs::write(&path, "{\"value\":1}\n{\"value\":2}\n").expect("complete jsonl");
+        let records =
+            read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read completed record");
+
+        assert_eq!(records, vec![JsonlTestRecord { value: 2 }]);
+        assert_eq!(cursor, 2);
 
         let _ = fs::remove_file(path);
     }
