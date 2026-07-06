@@ -1851,6 +1851,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           knownIncidentIds = new Set(incidents.map((incident) => incident.id));
           lastSyncedAt = new Date();
           refreshDelayMs = BASE_REFRESH_INTERVAL_MS;
+          await loadHealth();
           renderSidebarStats();
           renderSystemHealth();
           renderIncidentList();
@@ -2837,45 +2838,55 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     async function setIncidentStatus(id, status) {
       const requestVersion = detailRequestVersion;
-      const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
+      try {
+        const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
 
-      const incident = await response.json();
-      clearNotesDraft(id);
-      await loadIncidents({ silent: true });
-      if (!isLatestDetailRequest(id, requestVersion)) {
-        return;
+        const incident = await response.json();
+        clearNotesDraft(id);
+        await loadIncidents({ silent: true });
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
+        renderDetail(incident, incident.cached_explanation, false, null);
+        showToast(`Incident marked ${status}.`);
+      } catch (error) {
+        showToast(`Could not update incident status. ${error.message || String(error)}`, 'warning');
       }
-      renderDetail(incident, incident.cached_explanation, false, null);
     }
 
     async function saveIncidentNotes(id) {
       const requestVersion = detailRequestVersion;
       const notes = document.getElementById('incident-notes')?.value || '';
-      const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
-      });
+      try {
+        const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes }),
+        });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
 
-      const incident = await response.json();
-      clearNotesDraft(id);
-      await loadIncidents({ silent: true });
-      if (!isLatestDetailRequest(id, requestVersion)) {
-        return;
+        const incident = await response.json();
+        clearNotesDraft(id);
+        await loadIncidents({ silent: true });
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
+        renderDetail(incident, incident.cached_explanation, false, null);
+        showToast('Investigation notes saved.');
+      } catch (error) {
+        showToast(`Could not save notes. ${error.message || String(error)}`, 'warning');
       }
-      renderDetail(incident, incident.cached_explanation, false, null);
     }
 
     async function regenerateExplanation(id) {
