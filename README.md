@@ -6,7 +6,7 @@ Release regression detection for engineering teams.
 It correlates a deploy event with post-deploy changes in error rate, latency, and log signatures, then saves a triage-ready incident with evidence, notes, exports, and an explanation.
 The hosted Vercel demo also runs an evidence-bounded triage agent automatically after each deploy event and persists the agent report to Supabase.
 
-The intended user is an engineer, SRE, or engineering manager who needs to understand whether a release caused customer-facing risk without reading raw metrics and logs first.
+The intended user is an on-call engineer, platform engineer, or engineering manager who needs to understand whether a release caused customer-facing risk without reading raw metrics and logs first.
 
 ## Why this is a strong Rust project
 

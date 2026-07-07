@@ -60,8 +60,12 @@ impl ChangeDetector {
     }
 
     pub fn detect(&mut self, sample: &MetricSample, baseline: &BaselineSnapshot) -> Option<String> {
-        let error_shift = self.error_cusum.update(sample.error_rate, baseline.error_rate_mean);
-        let latency_shift = self.latency_cusum.update(sample.p95_latency_ms, baseline.p95_latency_mean);
+        let error_shift = self
+            .error_cusum
+            .update(sample.error_rate, baseline.error_rate_mean);
+        let latency_shift = self
+            .latency_cusum
+            .update(sample.p95_latency_ms, baseline.p95_latency_mean);
 
         match (error_shift, latency_shift) {
             (true, true) => Some("error rate and latency shifted above baseline".to_string()),

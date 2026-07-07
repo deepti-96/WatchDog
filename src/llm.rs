@@ -52,7 +52,12 @@ async fn explain_incident_with_ollama(incident: &Incident) -> Result<String> {
         .json(&request)
         .send()
         .await
-        .with_context(|| format!("failed to reach Ollama at {}. Start Ollama first or set WATCHDOG_OLLAMA_BASE_URL", endpoint))?
+        .with_context(|| {
+            format!(
+                "failed to reach Ollama at {}. Start Ollama first or set WATCHDOG_OLLAMA_BASE_URL",
+                endpoint
+            )
+        })?
         .error_for_status()?
         .json::<OllamaResponse>()
         .await?;
