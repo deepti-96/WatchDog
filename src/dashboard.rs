@@ -2,9 +2,7 @@ use crate::alert;
 use crate::engine::WatchdogEngine;
 use crate::export;
 use crate::llm;
-use crate::model::{
-    normalize_incident_status, DeployEvent, Incident, LogEvent, MetricSample,
-};
+use crate::model::{normalize_incident_status, DeployEvent, Incident, LogEvent, MetricSample};
 use crate::storage;
 use axum::extract::{Path, State};
 use axum::http::{header, StatusCode};
@@ -73,9 +71,15 @@ pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Resul
         .route("/api/incidents/{id}/status", post(update_incident_status))
         .route("/api/incidents/{id}/notes", post(update_incident_notes))
         .route("/api/incidents/{id}/explain", post(explain_incident))
-        .route("/api/incidents/{id}/explain/refresh", post(refresh_incident_explanation))
+        .route(
+            "/api/incidents/{id}/explain/refresh",
+            post(refresh_incident_explanation),
+        )
         .route("/api/incidents/{id}/export/json", get(export_incident_json))
-        .route("/api/incidents/{id}/export/markdown", get(export_incident_markdown))
+        .route(
+            "/api/incidents/{id}/export/markdown",
+            get(export_incident_markdown),
+        )
         .route("/api/incidents/{id}/summary", get(get_incident_summary))
         .with_state(app_state);
 
@@ -144,14 +148,13 @@ async fn get_incident(State(state): State<AppState>, Path(id): Path<String>) -> 
     }
 }
 
-async fn export_incident_json(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn export_incident_json(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     match serde_json::to_string_pretty(&incident) {
@@ -165,7 +168,9 @@ async fn export_incident_json(
                 "attachment; filename=\"{}-incident.json\"",
                 incident.id
             )) {
-                response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
+                response
+                    .headers_mut()
+                    .insert(header::CONTENT_DISPOSITION, value);
             }
             response
         }
@@ -180,7 +185,9 @@ async fn export_incident_markdown(
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     let body = export::render_markdown(&incident);
@@ -193,19 +200,20 @@ async fn export_incident_markdown(
         "attachment; filename=\"{}-incident.md\"",
         incident.id
     )) {
-        response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
+        response
+            .headers_mut()
+            .insert(header::CONTENT_DISPOSITION, value);
     }
     response
 }
 
-async fn get_incident_summary(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn get_incident_summary(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     export::render_summary(&incident).into_response()
@@ -261,7 +269,9 @@ async fn generate_incident_explanation(
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     if !force_refresh {
@@ -271,14 +281,19 @@ async fn generate_incident_explanation(
     }
 
     match llm::explain_incident(&incident).await {
-        Ok(explanation) => match storage::update_incident_explanation(&state.state_dir, &incident.id, &explanation) {
-            Ok(Some(updated)) => Json(ExplainResponse {
-                explanation: updated.cached_explanation.unwrap_or(explanation),
-            })
-            .into_response(),
-            Ok(None) => Json(ExplainResponse { explanation }).into_response(),
-            Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
-        },
+        Ok(explanation) => {
+            match storage::update_incident_explanation(&state.state_dir, &incident.id, &explanation)
+            {
+                Ok(Some(updated)) => Json(ExplainResponse {
+                    explanation: updated.cached_explanation.unwrap_or(explanation),
+                })
+                .into_response(),
+                Ok(None) => Json(ExplainResponse { explanation }).into_response(),
+                Err(error) => {
+                    (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+                }
+            }
+        }
         Err(error) => (StatusCode::BAD_GATEWAY, error.to_string()).into_response(),
     }
 }
@@ -317,13 +332,29 @@ fn run_demo_scenario(state_dir: &std::path::Path, scenario: &str) -> anyhow::Res
         let degraded = i >= 35;
         let (error_rate, latency, signature) = match scenario {
             "payments-latency" => (
-                if degraded { 0.045 + ((i % 2) as f64 * 0.006) } else { 0.012 },
-                if degraded { 345.0 + ((i % 3) as f64 * 24.0) } else { 124.0 },
+                if degraded {
+                    0.045 + ((i % 2) as f64 * 0.006)
+                } else {
+                    0.012
+                },
+                if degraded {
+                    345.0 + ((i % 3) as f64 * 24.0)
+                } else {
+                    124.0
+                },
                 "Payment provider timeout while authorizing card 4242 request 8f91ab22",
             ),
             _ => (
-                if degraded { 0.108 + ((i % 3) as f64 * 0.01) } else { 0.013 },
-                if degraded { 265.0 + ((i % 2) as f64 * 28.0) } else { 121.0 },
+                if degraded {
+                    0.108 + ((i % 3) as f64 * 0.01)
+                } else {
+                    0.013
+                },
+                if degraded {
+                    265.0 + ((i % 2) as f64 * 28.0)
+                } else {
+                    121.0
+                },
                 "Database timeout while loading checkout session user 123 request 8f91ab22",
             ),
         };
@@ -774,7 +805,42 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
     }
 
     .sidebar-stats {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .system-health {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .health-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .health-chip {
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    html[data-theme="dark"] .health-chip {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .health-chip strong {
+      display: block;
+      margin-top: 5px;
+      overflow-wrap: anywhere;
+      font-size: 0.9rem;
     }
 
     .list-controls {
@@ -943,6 +1009,29 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     .incident-card p:last-child {
       margin-top: 10px;
+    }
+
+    .incident-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .incident-metric {
+      min-width: 0;
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      background: rgba(47, 91, 234, 0.08);
+      color: var(--ink);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    .incident-metric strong {
+      display: block;
+      margin-bottom: 2px;
+      overflow-wrap: anywhere;
     }
 
     .badge-row {
@@ -1183,6 +1272,63 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     .compare-row strong {
       font-size: 1.15rem;
+    }
+
+    .operator-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .operator-item {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    html[data-theme="dark"] .operator-item {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .operator-index {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 800;
+      font-size: 0.78rem;
+    }
+
+    .evidence-table {
+      display: grid;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .evidence-row {
+      display: grid;
+      grid-template-columns: minmax(150px, 0.44fr) minmax(0, 0.56fr);
+      gap: 14px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .evidence-row:first-child {
+      border-top: none;
+    }
+
+    html[data-theme="dark"] .evidence-row {
+      background: rgba(255, 255, 255, 0.05);
     }
 
     .callout,
@@ -1551,13 +1697,28 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <strong id="incident-count">0</strong>
         </article>
         <article class="mini-card">
+          <div class="label">Open</div>
+          <strong id="open-count">0</strong>
+        </article>
+        <article class="mini-card">
           <div class="label">High Severity</div>
           <strong id="high-count">0</strong>
         </article>
         <article class="mini-card">
-          <div class="label">AI Cached</div>
+          <div class="label">Explained</div>
           <strong id="cached-count">0</strong>
         </article>
+      </section>
+
+      <section class="system-health reveal reveal-delay-2" aria-label="Dashboard system health">
+        <div>
+          <div class="label">Runtime</div>
+          <strong>Dashboard health</strong>
+        </div>
+        <div id="system-health-grid" class="health-grid">
+          <div class="health-chip"><div class="label">Status</div><strong>Checking</strong></div>
+          <div class="health-chip"><div class="label">Storage</div><strong>Unknown</strong></div>
+        </div>
       </section>
 
       <section class="list-controls reveal reveal-delay-3" aria-label="Incident filters">
@@ -1589,6 +1750,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
   <script>
     let incidents = [];
+    let health = null;
     let activeIncidentId = null;
     let searchQuery = '';
     let severityFilter = 'all';
@@ -1650,9 +1812,23 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       bindVisibilityRefresh();
       renderEmptyDetail();
       setupRevealObserver();
+      loadHealth();
       loadIncidents();
       startAutoRefresh();
     });
+
+    async function loadHealth() {
+      try {
+        const response = await fetch('/healthz');
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+        health = await response.json();
+      } catch (error) {
+        health = { status: 'error', storage_backend: 'unknown', explainer: 'unknown', incident_count: 0, state_dir: error.message || String(error) };
+      }
+      renderSystemHealth();
+    }
 
     async function loadIncidents(options = {}) {
       if (loadIncidentsInFlight) {
@@ -1676,6 +1852,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           lastSyncedAt = new Date();
           refreshDelayMs = BASE_REFRESH_INTERVAL_MS;
           renderSidebarStats();
+          renderSystemHealth();
           renderIncidentList();
           renderSyncStatus();
 
@@ -1698,6 +1875,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           renderSyncStatus(error.message || String(error));
           if (!silent) {
             renderSidebarStats();
+            renderSystemHealth();
             renderIncidentListError(error);
             renderErrorDetail(error);
           }
@@ -2222,8 +2400,34 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     function renderSidebarStats() {
       document.getElementById('incident-count').textContent = incidents.length;
+      document.getElementById('open-count').textContent = incidents.filter((incident) => incident.status === 'open').length;
       document.getElementById('high-count').textContent = incidents.filter((incident) => incident.severity === 'high').length;
       document.getElementById('cached-count').textContent = incidents.filter((incident) => incident.has_cached_explanation).length;
+    }
+
+    function renderSystemHealth() {
+      const container = document.getElementById('system-health-grid');
+      if (!container) {
+        return;
+      }
+
+      const current = health || {
+        status: 'checking',
+        storage_backend: 'unknown',
+        explainer: 'unknown',
+        incident_count: incidents.length,
+      };
+
+      container.innerHTML = `
+        ${renderHealthChip('Status', current.status || 'unknown')}
+        ${renderHealthChip('Storage', current.storage_backend || 'unknown')}
+        ${renderHealthChip('Explainer', current.explainer || 'unknown')}
+        ${renderHealthChip('Records', String(current.incident_count ?? incidents.length))}
+      `;
+    }
+
+    function renderHealthChip(label, value) {
+      return `<div class="health-chip"><div class="label">${escapeHtml(label)}</div><strong>${escapeHtml(value)}</strong></div>`;
     }
 
     function renderIncidentListLoading() {
@@ -2273,7 +2477,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
               ${renderBadge(incident.severity, incident.severity)}
               ${renderBadge(incident.status, incident.status)}
               ${renderBadge('environment', incident.environment)}
-              ${incident.has_cached_explanation ? renderBadge('subtle', 'AI cached') : ''}
+              ${incident.has_cached_explanation ? renderBadge('subtle', 'explained') : ''}
               ${incident.has_notes ? renderBadge('subtle', 'Notes') : ''}
             </div>
             ${renderBadge('subtle', new Date(incident.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}
@@ -2281,8 +2485,17 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <h3 style="margin-top: 10px;">${escapeHtml(incident.deploy_id)}</h3>
           <p class="meta">${new Date(incident.created_at).toLocaleString()}</p>
           <p class="meta">${escapeHtml(incident.summary)}</p>
+          <div class="incident-metrics" aria-label="Incident detection metrics">
+            ${renderIncidentMetric(`${incident.seconds_after_deploy}s`, 'delay')}
+            ${renderIncidentMetric(`+${Number(incident.error_rate_delta).toFixed(3)}`, 'error')}
+            ${renderIncidentMetric(`+${Number(incident.latency_delta_ms).toFixed(0)}ms`, 'latency')}
+          </div>
         </article>
       `;
+    }
+
+    function renderIncidentMetric(value, label) {
+      return `<div class="incident-metric"><strong>${escapeHtml(value)}</strong>${escapeHtml(label)}</div>`;
     }
 
     function handleIncidentKey(event, id) {
@@ -2427,6 +2640,19 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <div>
             <article class="section-card reveal reveal-delay-1">
               <div class="section-heading">
+                <h3>Operator Checklist</h3>
+                <span class="muted">First-response steps</span>
+              </div>
+              <div class="operator-grid">
+                ${renderOperatorItem(1, 'Confirm the deploy window', `Deploy ${verdict.deploy_id} in ${verdict.environment} was detected ${verdict.seconds_after_deploy}s before the alert.`)}
+                ${renderOperatorItem(2, 'Compare customer-facing signals', `Error rate moved by ${verdict.error_rate_delta.toFixed(3)} and P95 latency moved by ${verdict.latency_delta_ms.toFixed(1)} ms.`)}
+                ${renderOperatorItem(3, 'Inspect the dominant error', signature)}
+                ${renderOperatorItem(4, 'Record the decision', 'Use notes and status to capture whether this stays open, needs rollback, or is resolved.')}
+              </div>
+            </article>
+
+            <article class="section-card reveal reveal-delay-1">
+              <div class="section-heading">
                 <h3>Before vs After</h3>
                 <span class="muted">Baseline against detected state</span>
               </div>
@@ -2452,6 +2678,20 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
                 <span class="muted">Detector verdict</span>
               </div>
               <div class="callout">${escapeHtml(incident.alert_text)}</div>
+            </article>
+
+            <article class="section-card reveal reveal-delay-2">
+              <div class="section-heading">
+                <h3>Detection Details</h3>
+                <span class="muted">Values persisted with the incident</span>
+              </div>
+              <div class="evidence-table">
+                ${renderEvidenceRow('Deploy id', verdict.deploy_id)}
+                ${renderEvidenceRow('Environment', verdict.environment)}
+                ${renderEvidenceRow('Reason', verdict.reason)}
+                ${renderEvidenceRow('Request rate', `${comparison.request_rate_at_detection.toFixed(1)} req/s`)}
+                ${renderEvidenceRow('New error signature', verdict.top_error_is_new ? 'yes' : 'no')}
+              </div>
             </article>
 
             <article class="section-card reveal reveal-delay-2">
@@ -2739,6 +2979,27 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           <strong>${escapeHtml(value)}</strong>
           <p class="meta" style="margin-top: 8px;">${escapeHtml(detail)}</p>
         </article>
+      `;
+    }
+
+    function renderOperatorItem(index, title, detail) {
+      return `
+        <div class="operator-item">
+          <span class="operator-index">${index}</span>
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            <p class="meta" style="margin-top: 4px;">${escapeHtml(detail)}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderEvidenceRow(label, value) {
+      return `
+        <div class="evidence-row">
+          <strong>${escapeHtml(label)}</strong>
+          <span class="meta">${escapeHtml(value)}</span>
+        </div>
       `;
     }
 
