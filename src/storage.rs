@@ -1,6 +1,4 @@
-use crate::model::{
-    normalize_incident_status, Incident, RegressionVerdict, INCIDENT_STATUS_OPEN,
-};
+use crate::model::{normalize_incident_status, Incident, RegressionVerdict, INCIDENT_STATUS_OPEN};
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use reqwest::blocking::Client;
@@ -11,7 +9,11 @@ use std::env;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
-pub fn persist_incident(state_dir: &Path, verdict: &RegressionVerdict, alert_text: &str) -> Result<Incident> {
+pub fn persist_incident(
+    state_dir: &Path,
+    verdict: &RegressionVerdict,
+    alert_text: &str,
+) -> Result<Incident> {
     let incident = Incident {
         id: build_incident_id(verdict),
         created_at: Utc::now(),
@@ -48,7 +50,8 @@ pub fn list_incidents(state_dir: &Path) -> Result<Vec<Incident>> {
         if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
             continue;
         }
-        let file = File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
+        let file =
+            File::open(&path).with_context(|| format!("failed to open {}", path.display()))?;
         let incident: Incident = serde_json::from_reader(file)?;
         incidents.push(incident);
     }
@@ -81,7 +84,11 @@ pub fn storage_backend_label() -> &'static str {
     }
 }
 
-pub fn update_incident_explanation(state_dir: &Path, incident_id: &str, explanation: &str) -> Result<Option<Incident>> {
+pub fn update_incident_explanation(
+    state_dir: &Path,
+    incident_id: &str,
+    explanation: &str,
+) -> Result<Option<Incident>> {
     let Some(mut incident) = read_incident(state_dir, incident_id)? else {
         return Ok(None);
     };
@@ -92,7 +99,11 @@ pub fn update_incident_explanation(state_dir: &Path, incident_id: &str, explanat
     Ok(Some(incident))
 }
 
-pub fn update_incident_status(state_dir: &Path, incident_id: &str, status: &str) -> Result<Option<Incident>> {
+pub fn update_incident_status(
+    state_dir: &Path,
+    incident_id: &str,
+    status: &str,
+) -> Result<Option<Incident>> {
     let Some(mut incident) = read_incident(state_dir, incident_id)? else {
         return Ok(None);
     };
@@ -104,7 +115,11 @@ pub fn update_incident_status(state_dir: &Path, incident_id: &str, status: &str)
     Ok(Some(incident))
 }
 
-pub fn update_incident_notes(state_dir: &Path, incident_id: &str, notes: &str) -> Result<Option<Incident>> {
+pub fn update_incident_notes(
+    state_dir: &Path,
+    incident_id: &str,
+    notes: &str,
+) -> Result<Option<Incident>> {
     let Some(mut incident) = read_incident(state_dir, incident_id)? else {
         return Ok(None);
     };
@@ -125,7 +140,8 @@ fn write_incident(state_dir: &Path, incident: &Incident) -> Result<()> {
     fs::create_dir_all(&incidents_dir)
         .with_context(|| format!("failed to create incidents dir {}", incidents_dir.display()))?;
     let path = incident_path(state_dir, &incident.id);
-    let file = File::create(&path).with_context(|| format!("failed to create {}", path.display()))?;
+    let file =
+        File::create(&path).with_context(|| format!("failed to create {}", path.display()))?;
     serde_json::to_writer_pretty(file, incident)?;
     Ok(())
 }
@@ -236,9 +252,8 @@ fn write_incident_sqlite(state_dir: &Path, incident: &Incident) -> Result<()> {
 
 fn list_incidents_sqlite(state_dir: &Path) -> Result<Vec<Incident>> {
     let connection = sqlite_connection(state_dir)?;
-    let mut statement = connection.prepare(
-        "SELECT incident_json FROM incidents ORDER BY created_at DESC",
-    )?;
+    let mut statement =
+        connection.prepare("SELECT incident_json FROM incidents ORDER BY created_at DESC")?;
     let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
 
     let mut incidents = Vec::new();
@@ -251,9 +266,8 @@ fn list_incidents_sqlite(state_dir: &Path) -> Result<Vec<Incident>> {
 
 fn read_incident_sqlite(state_dir: &Path, incident_id: &str) -> Result<Option<Incident>> {
     let connection = sqlite_connection(state_dir)?;
-    let mut statement = connection.prepare(
-        "SELECT incident_json FROM incidents WHERE id = ?1 LIMIT 1",
-    )?;
+    let mut statement =
+        connection.prepare("SELECT incident_json FROM incidents WHERE id = ?1 LIMIT 1")?;
     let mut rows = statement.query(params![incident_id])?;
     let Some(row) = rows.next()? else {
         return Ok(None);
@@ -298,7 +312,10 @@ fn supabase_headers() -> Result<HeaderMap> {
     let key = supabase_key()?;
     let mut headers = HeaderMap::new();
     headers.insert("apikey", HeaderValue::from_str(&key)?);
-    headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {key}"))?);
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {key}"))?,
+    );
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     Ok(headers)
 }
@@ -343,7 +360,9 @@ fn write_incident_supabase(incident: &Incident) -> Result<()> {
 
 fn list_incidents_supabase() -> Result<Vec<Incident>> {
     let response = Client::new()
-        .get(supabase_incidents_url("select=incident_json&order=created_at.desc")?)
+        .get(supabase_incidents_url(
+            "select=incident_json&order=created_at.desc",
+        )?)
         .headers(supabase_headers()?)
         .send()?;
 
@@ -412,7 +431,13 @@ fn build_incident_id(verdict: &RegressionVerdict) -> String {
     let slug = verdict
         .deploy_id
         .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch.to_ascii_lowercase() } else { '-' })
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect::<String>();
     format!("{}-{}", verdict.detected_at.timestamp(), slug)
 }

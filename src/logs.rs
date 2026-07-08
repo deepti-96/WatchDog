@@ -49,7 +49,11 @@ pub fn extract_error_signature(event: &LogEvent) -> Option<String> {
         return None;
     }
 
-    Some(format!("{}: {}", event.service, normalized_tokens.join(" ")))
+    Some(format!(
+        "{}: {}",
+        event.service,
+        normalized_tokens.join(" ")
+    ))
 }
 
 fn normalize_token(token: &str) -> String {
@@ -70,7 +74,13 @@ fn normalize_token(token: &str) -> String {
 
     trimmed
         .chars()
-        .map(|c| if c.is_ascii_digit() { '#' } else { c.to_ascii_lowercase() })
+        .map(|c| {
+            if c.is_ascii_digit() {
+                '#'
+            } else {
+                c.to_ascii_lowercase()
+            }
+        })
         .collect()
 }
 

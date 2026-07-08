@@ -132,8 +132,14 @@ mod tests {
 
     #[test]
     fn incident_status_normalizes_expected_values() {
-        assert_eq!(normalize_incident_status("open"), Some(INCIDENT_STATUS_OPEN));
-        assert_eq!(normalize_incident_status(" RESOLVED "), Some(INCIDENT_STATUS_RESOLVED));
+        assert_eq!(
+            normalize_incident_status("open"),
+            Some(INCIDENT_STATUS_OPEN)
+        );
+        assert_eq!(
+            normalize_incident_status(" RESOLVED "),
+            Some(INCIDENT_STATUS_RESOLVED)
+        );
         assert_eq!(normalize_incident_status("invalid"), None);
     }
 

@@ -69,7 +69,9 @@ pub fn parse_log_line(line: &str) -> Option<LogEvent> {
     let parts = trimmed.splitn(4, ' ').collect::<Vec<_>>();
     if parts.len() >= 4 && looks_like_timestamp(parts[0]) {
         return Some(LogEvent {
-            timestamp: chrono::DateTime::parse_from_rfc3339(parts[0]).ok()?.with_timezone(&Utc),
+            timestamp: chrono::DateTime::parse_from_rfc3339(parts[0])
+                .ok()?
+                .with_timezone(&Utc),
             level: parts[1].to_string(),
             service: parts[2].to_string(),
             message: parts[3].to_string(),
@@ -94,7 +96,8 @@ fn looks_like_timestamp(value: &str) -> bool {
 }
 
 fn reset_offset_if_truncated(path: &Path, offset: &mut u64) -> Result<()> {
-    let metadata = fs::metadata(path).with_context(|| format!("failed to stat {}", path.display()))?;
+    let metadata =
+        fs::metadata(path).with_context(|| format!("failed to stat {}", path.display()))?;
     if metadata.len() < *offset {
         *offset = 0;
     }

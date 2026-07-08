@@ -34,7 +34,12 @@ pub fn render_markdown(incident: &Incident) -> String {
     let timeline = verdict
         .timeline
         .iter()
-        .map(|event| format!("- **{}** ({}) - {}", event.label, event.timestamp, event.detail))
+        .map(|event| {
+            format!(
+                "- **{}** ({}) - {}",
+                event.label, event.timestamp, event.detail
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -75,7 +80,9 @@ pub fn render_markdown(incident: &Incident) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Incident, IncidentMetricComparison, IncidentTimelineEvent, RegressionVerdict};
+    use crate::model::{
+        Incident, IncidentMetricComparison, IncidentTimelineEvent, RegressionVerdict,
+    };
     use chrono::Utc;
 
     #[test]

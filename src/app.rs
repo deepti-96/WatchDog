@@ -31,7 +31,16 @@ pub async fn run() -> Result<()> {
             log_file,
             monitoring_window_secs,
             webhook_url,
-        } => run_daemon(state_dir, config, log_file, monitoring_window_secs, webhook_url).await,
+        } => {
+            run_daemon(
+                state_dir,
+                config,
+                log_file,
+                monitoring_window_secs,
+                webhook_url,
+            )
+            .await
+        }
         Command::Serve {
             state_dir,
             host,
@@ -68,14 +77,19 @@ async fn run_daemon(
     webhook_url: Option<String>,
 ) -> Result<()> {
     ensure_state_dir(&state_dir)?;
-    let settings = WatchdogConfig::load(config_path.as_deref())?
-        .resolve_run_settings(log_file, monitoring_window_secs, webhook_url);
+    let settings = WatchdogConfig::load(config_path.as_deref())?.resolve_run_settings(
+        log_file,
+        monitoring_window_secs,
+        webhook_url,
+    );
     let metrics_path = state_dir.join("metrics.jsonl");
     let deploys_path = state_dir.join("deploy-events.jsonl");
     touch(&metrics_path)?;
     touch(&deploys_path)?;
 
-    let log_path = settings.log_file.unwrap_or_else(|| state_dir.join("app.log"));
+    let log_path = settings
+        .log_file
+        .unwrap_or_else(|| state_dir.join("app.log"));
     let mut tailer = LogTailer::new(log_path);
     tailer.ensure_exists()?;
 
@@ -196,8 +210,16 @@ async fn simulate(state_dir: PathBuf, deploy: String, bad_deploy: bool) -> Resul
             &metrics_path,
             &MetricSample {
                 timestamp: start + Duration::seconds(i),
-                error_rate: if degraded { 0.09 + ((i % 3) as f64 * 0.01) } else { 0.012 },
-                p95_latency_ms: if degraded { 260.0 + ((i % 2) as f64 * 30.0) } else { 120.0 },
+                error_rate: if degraded {
+                    0.09 + ((i % 3) as f64 * 0.01)
+                } else {
+                    0.012
+                },
+                p95_latency_ms: if degraded {
+                    260.0 + ((i % 2) as f64 * 30.0)
+                } else {
+                    120.0
+                },
                 request_rate: 405.0,
             },
         )?;
@@ -221,8 +243,14 @@ async fn simulate(state_dir: PathBuf, deploy: String, bad_deploy: bool) -> Resul
         log_path.display(),
         deploys_path.display()
     );
-    println!("start the daemon with `cargo run -- run --state-dir {}`", state_dir.display());
-    println!("then launch the dashboard with `cargo run -- serve --state-dir {}`", state_dir.display());
+    println!(
+        "start the daemon with `cargo run -- run --state-dir {}`",
+        state_dir.display()
+    );
+    println!(
+        "then launch the dashboard with `cargo run -- serve --state-dir {}`",
+        state_dir.display()
+    );
     Ok(())
 }
 
@@ -282,8 +310,16 @@ fn demo(state_dir: PathBuf, deploy: String, environment: String, healthy: bool) 
 
         let sample = MetricSample {
             timestamp,
-            error_rate: if degraded { 0.11 + ((i % 3) as f64 * 0.01) } else { 0.012 },
-            p95_latency_ms: if degraded { 260.0 + ((i % 2) as f64 * 30.0) } else { 120.0 },
+            error_rate: if degraded {
+                0.11 + ((i % 3) as f64 * 0.01)
+            } else {
+                0.012
+            },
+            p95_latency_ms: if degraded {
+                260.0 + ((i % 2) as f64 * 30.0)
+            } else {
+                120.0
+            },
             request_rate: 405.0,
         };
         append_jsonl(&metrics_path, &sample)?;
@@ -322,10 +358,16 @@ fn run_benchmark(trials: usize, monitoring_window_secs: u64) -> Result<()> {
     let summary = benchmark::run(trials, monitoring_window_secs);
     println!("watchdog benchmark summary");
     println!("trials: {}", summary.trials);
-    println!("healthy false positives: {}", summary.healthy_false_positives);
+    println!(
+        "healthy false positives: {}",
+        summary.healthy_false_positives
+    );
     println!("bad deploys detected: {}", summary.bad_detected);
     println!("bad deploys missed: {}", summary.bad_missed);
-    println!("average detection latency: {:.2}s", summary.average_detection_secs);
+    println!(
+        "average detection latency: {:.2}s",
+        summary.average_detection_secs
+    );
     println!("best detection latency: {}s", summary.best_detection_secs);
     println!("worst detection latency: {}s", summary.worst_detection_secs);
     Ok(())
@@ -393,7 +435,7 @@ where
         if line.trim().is_empty() {
             continue;
         }
-        out.push(serde_json::from_str(&line)?);
+        out.push(serde_json::from_str(line)?);
     }
 
     *cursor = lines.len();
@@ -416,7 +458,10 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time")
             .as_nanos();
-        std::env::temp_dir().join(format!("watchdog-{name}-{}-{nanos}.jsonl", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "watchdog-{name}-{}-{nanos}.jsonl",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -426,11 +471,15 @@ mod tests {
 
         let mut cursor = 0;
         let records = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read records");
-        assert_eq!(records, vec![JsonlTestRecord { value: 1 }, JsonlTestRecord { value: 2 }]);
+        assert_eq!(
+            records,
+            vec![JsonlTestRecord { value: 1 }, JsonlTestRecord { value: 2 }]
+        );
         assert_eq!(cursor, 3);
 
         append_jsonl(&path, &JsonlTestRecord { value: 3 }).expect("append record");
-        let records = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read appended record");
+        let records =
+            read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read appended record");
         assert_eq!(records, vec![JsonlTestRecord { value: 3 }]);
         assert_eq!(cursor, 4);
 
@@ -443,11 +492,13 @@ mod tests {
         fs::write(&path, "{\"value\":1}\n{\"value\":2}\n").expect("write jsonl");
 
         let mut cursor = 0;
-        let _ = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read initial records");
+        let _ =
+            read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read initial records");
         assert_eq!(cursor, 2);
 
         fs::write(&path, "{\"value\":9}\n").expect("replace jsonl");
-        let records = read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read replacement record");
+        let records =
+            read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read replacement record");
         assert_eq!(records, vec![JsonlTestRecord { value: 9 }]);
         assert_eq!(cursor, 1);
 

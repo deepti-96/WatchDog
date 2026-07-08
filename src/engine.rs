@@ -97,10 +97,14 @@ impl WatchdogEngine {
         if let Some(signature) = extract_error_signature(&event) {
             if within_window {
                 if let Some(active) = &mut self.active_deploy {
-                    let observation = active.post_errors.entry(signature.clone()).or_insert(ErrorObservation {
-                        count: 0,
-                        first_seen_at: event.timestamp,
-                    });
+                    let observation =
+                        active
+                            .post_errors
+                            .entry(signature.clone())
+                            .or_insert(ErrorObservation {
+                                count: 0,
+                                first_seen_at: event.timestamp,
+                            });
                     observation.count += 1;
                 }
             }
@@ -140,28 +144,30 @@ impl WatchdogEngine {
 
     fn build_verdict(&mut self, sample: MetricSample, reason: String) -> Option<RegressionVerdict> {
         let active = self.active_deploy.take()?;
-        let (top_error_signature, top_error_count, top_error_is_new, first_error_at) = dominant_error_summary(&active);
+        let (top_error_signature, top_error_count, top_error_is_new, first_error_at) =
+            dominant_error_summary(&active);
 
-        let mut timeline = vec![
-            IncidentTimelineEvent {
-                label: "Deploy started".to_string(),
-                timestamp: active.event.timestamp,
-                detail: format!("{} deployed to {}", active.event.deploy_id, active.event.environment),
-            },
-        ];
+        let mut timeline = vec![IncidentTimelineEvent {
+            label: "Deploy started".to_string(),
+            timestamp: active.event.timestamp,
+            detail: format!(
+                "{} deployed to {}",
+                active.event.deploy_id, active.event.environment
+            ),
+        }];
 
         if let (Some(signature), Some(first_seen_at)) = (&top_error_signature, first_error_at) {
             timeline.push(IncidentTimelineEvent {
                 label: "First dominant error".to_string(),
                 timestamp: first_seen_at,
-                detail: format!("{}", signature),
+                detail: signature.to_string(),
             });
         }
 
         timeline.push(IncidentTimelineEvent {
             label: "Regression detected".to_string(),
             timestamp: sample.timestamp,
-            detail: format!("{}", reason),
+            detail: reason.to_string(),
         });
 
         let verdict = RegressionVerdict {
@@ -191,7 +197,9 @@ impl WatchdogEngine {
     }
 }
 
-fn dominant_error_summary(active: &ActiveDeploy) -> (Option<String>, usize, bool, Option<DateTime<Utc>>) {
+fn dominant_error_summary(
+    active: &ActiveDeploy,
+) -> (Option<String>, usize, bool, Option<DateTime<Utc>>) {
     let Some((signature, observation)) = active.post_errors.iter().max_by(|left, right| {
         left.1
             .count

@@ -82,8 +82,16 @@ fn run_scenario(seed: usize, bad_deploy: bool, monitoring_window_secs: u64) -> O
         let degraded = bad_deploy && i >= 35;
         let verdict = engine.ingest_metric(MetricSample {
             timestamp: start + Duration::seconds(i),
-            error_rate: if degraded { 0.085 + drift * 0.012 } else { 0.010 + drift * 0.001 },
-            p95_latency_ms: if degraded { 245.0 + drift * 18.0 } else { 118.0 + drift * 4.0 },
+            error_rate: if degraded {
+                0.085 + drift * 0.012
+            } else {
+                0.010 + drift * 0.001
+            },
+            p95_latency_ms: if degraded {
+                245.0 + drift * 18.0
+            } else {
+                118.0 + drift * 4.0
+            },
             request_rate: 405.0 + drift * 2.0,
         });
 

@@ -33,7 +33,11 @@ impl RingBuffer {
 
         let count = self.samples.len();
         let error_sum: f64 = self.samples.iter().map(|sample| sample.error_rate).sum();
-        let latency_sum: f64 = self.samples.iter().map(|sample| sample.p95_latency_ms).sum();
+        let latency_sum: f64 = self
+            .samples
+            .iter()
+            .map(|sample| sample.p95_latency_ms)
+            .sum();
 
         Some(BaselineSnapshot {
             error_rate_mean: error_sum / count as f64,
