@@ -692,7 +692,7 @@
 
         <section class="panel section">
           <div class="label">Rollback Decision Brief</div>
-          <div style="margin-top: 12px;">${renderRollbackBrief(incident.rollback_brief)}</div>
+          <div id="rollback-brief" style="margin-top: 12px;">${renderRollbackBrief(incident.rollback_brief)}</div>
         </section>
       `;
     }
@@ -706,6 +706,9 @@
     async function runAgent(id) {
       const result = await api(`/api/incidents/${encodeURIComponent(id)}/agent`, { method: 'POST' });
       document.getElementById('agent-report').innerHTML = renderAgentReport(result.agent_report);
+      if (result.rollback_brief) {
+        document.getElementById('rollback-brief').innerHTML = renderRollbackBrief(result.rollback_brief);
+      }
       await loadIncidents();
     }
 
