@@ -731,7 +731,10 @@
 
     async function copySummary(id) {
       const incident = await api(`/api/incidents/${encodeURIComponent(id)}`);
-      const text = `${incident.summary}\n${incident.alert_text}`;
+      const rollback = incident.rollback_brief
+        ? `\nRollback decision: ${incident.rollback_brief.decision}\nCustomer risk: ${incident.rollback_brief.customer_risk}`
+        : '';
+      const text = `${incident.summary}\n${incident.alert_text}${rollback}`;
       await navigator.clipboard.writeText(text);
     }
 
