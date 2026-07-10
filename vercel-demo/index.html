@@ -494,10 +494,19 @@
     async function loadIncidents() {
       try {
         incidents = await api('/api/incidents');
-        if (!activeIncidentId && incidents[0]) activeIncidentId = incidents[0].id;
+        const visible = visibleIncidents();
+        if (!activeIncidentId && visible[0]) activeIncidentId = visible[0].id;
+        if (activeIncidentId && visible.length && !visible.some((incident) => incident.id === activeIncidentId)) {
+          activeIncidentId = visible[0].id;
+        }
+        if (activeIncidentId && !incidents.some((incident) => incident.id === activeIncidentId)) {
+          activeIncidentId = visible[0]?.id || incidents[0]?.id || null;
+        }
         renderStats();
         renderList();
-        if (activeIncidentId) {
+        if (!visible.length && (search || statusFilter !== 'all')) {
+          renderEmpty('No incidents match the current filters.');
+        } else if (activeIncidentId) {
           await selectIncident(activeIncidentId);
         } else {
           renderEmpty();
