@@ -203,6 +203,7 @@
     .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .signal-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 20px 0 18px; }
     .overview-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
+    .section .signal-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 
     .card {
       padding: 16px;
@@ -359,6 +360,7 @@
       .shell { width: calc(100vw - 18px); margin: 10px auto; }
       .sidebar, .detail { padding: 18px; }
       .stat-grid, .signal-grid, .overview-grid, .actions { grid-template-columns: 1fr; }
+      .release-event { grid-template-columns: 1fr; }
     }
   </style>
 </head>
