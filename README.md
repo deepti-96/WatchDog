@@ -79,6 +79,15 @@ For hosted demos, see [`deploy/README.md`](./deploy/README.md):
 - Dockerized Rust dashboard for Render, Railway, Fly.io, or any Docker host
 - Deployment notes for persistent state and lightweight explanations
 
+## Interview demo script
+
+1. Open the hosted Vercel dashboard and point out that Supabase is connected in the sidebar health chip.
+2. Click `Deploy Checkout API` or `Deploy Payments API` to trigger a production deploy event.
+3. Show the autonomous run: WatchDog receives the deploy event, compares against the previous stable baseline, detects the regression, generates an explanation, runs triage, and stores the incident.
+4. Walk through the evidence cards: detection delay, error signature, request rate, error-rate delta, and latency delta.
+5. Show the triage agent and rollback decision brief, then explain that rollback is recommended but deliberately human-approved.
+6. Add an investigation note, mark the incident resolved, refresh, and show that the state persists.
+
 The live dashboard exposes `GET /healthz` for deployment checks.
 Environment examples are in [`.env.example`](./.env.example).
 
