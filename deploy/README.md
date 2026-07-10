@@ -44,6 +44,17 @@ Hosted endpoints:
 
 The hosted demo does not run a long-lived Rust daemon. It uses Vercel serverless APIs for the public product workflow and Supabase as the durable database. The demo deploy/telemetry source is generated, while persistence, status, notes, explanations, and agent reports are real backend writes.
 
+## Hosted verification checklist
+
+After each Vercel deployment:
+
+1. Open `/api/healthz` and confirm `status` is `ok` and `storage_backend` is `supabase`.
+2. Open the dashboard and confirm the incident count matches Supabase.
+3. Trigger `Deploy Checkout API` and confirm a new production incident appears.
+4. Verify the incident includes an evidence explanation, triage agent report, and rollback decision brief without extra manual clicks.
+5. Save an investigation note, mark the incident resolved, refresh, and confirm both values persist.
+6. Use `Copy Summary` and confirm the copied handoff includes the rollback decision context.
+
 ## Docker dashboard service
 
 Build and run the live Rust dashboard with seeded demo data:
