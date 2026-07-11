@@ -35,7 +35,11 @@ pub fn render(verdict: &RegressionVerdict) -> String {
     )
 }
 
-pub async fn send_webhook(webhook_url: &str, body: &str, verdict: &RegressionVerdict) -> Result<()> {
+pub async fn send_webhook(
+    webhook_url: &str,
+    body: &str,
+    verdict: &RegressionVerdict,
+) -> Result<()> {
     let client = reqwest::Client::new();
     client
         .post(webhook_url)
@@ -64,10 +68,16 @@ fn is_slack_webhook(webhook_url: &str) -> bool {
 fn render_slack_blocks(verdict: &RegressionVerdict) -> Vec<Value> {
     let top_error = match &verdict.top_error_signature {
         Some(signature) if verdict.top_error_is_new => {
-            format!("New error: `{}` seen {} times", signature, verdict.top_error_count)
+            format!(
+                "New error: `{}` seen {} times",
+                signature, verdict.top_error_count
+            )
         }
         Some(signature) => {
-            format!("Post-deploy error: `{}` seen {} times", signature, verdict.top_error_count)
+            format!(
+                "Post-deploy error: `{}` seen {} times",
+                signature, verdict.top_error_count
+            )
         }
         None => "No dominant error signature captured".to_string(),
     };

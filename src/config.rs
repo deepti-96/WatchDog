@@ -65,7 +65,10 @@ impl WatchdogConfig {
                     .detector
                     .error_threshold
                     .unwrap_or(detector_defaults.error_threshold),
-                error_drift: self.detector.error_drift.unwrap_or(detector_defaults.error_drift),
+                error_drift: self
+                    .detector
+                    .error_drift
+                    .unwrap_or(detector_defaults.error_drift),
                 latency_threshold: self
                     .detector
                     .latency_threshold
@@ -118,10 +121,8 @@ mod tests {
 
     #[test]
     fn config_loads_json_file() {
-        let path = std::env::temp_dir().join(format!(
-            "watchdog-config-test-{}.json",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("watchdog-config-test-{}.json", std::process::id()));
         fs::write(
             &path,
             r#"{

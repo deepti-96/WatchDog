@@ -2,9 +2,7 @@ use crate::alert;
 use crate::engine::WatchdogEngine;
 use crate::export;
 use crate::llm;
-use crate::model::{
-    normalize_incident_status, DeployEvent, Incident, LogEvent, MetricSample,
-};
+use crate::model::{normalize_incident_status, DeployEvent, Incident, LogEvent, MetricSample};
 use crate::storage;
 use axum::extract::{Path, State};
 use axum::http::{header, StatusCode};
@@ -73,9 +71,15 @@ pub async fn serve(state_dir: PathBuf, host: String, port: u16) -> anyhow::Resul
         .route("/api/incidents/{id}/status", post(update_incident_status))
         .route("/api/incidents/{id}/notes", post(update_incident_notes))
         .route("/api/incidents/{id}/explain", post(explain_incident))
-        .route("/api/incidents/{id}/explain/refresh", post(refresh_incident_explanation))
+        .route(
+            "/api/incidents/{id}/explain/refresh",
+            post(refresh_incident_explanation),
+        )
         .route("/api/incidents/{id}/export/json", get(export_incident_json))
-        .route("/api/incidents/{id}/export/markdown", get(export_incident_markdown))
+        .route(
+            "/api/incidents/{id}/export/markdown",
+            get(export_incident_markdown),
+        )
         .route("/api/incidents/{id}/summary", get(get_incident_summary))
         .with_state(app_state);
 
@@ -144,14 +148,13 @@ async fn get_incident(State(state): State<AppState>, Path(id): Path<String>) -> 
     }
 }
 
-async fn export_incident_json(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn export_incident_json(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     match serde_json::to_string_pretty(&incident) {
@@ -165,7 +168,9 @@ async fn export_incident_json(
                 "attachment; filename=\"{}-incident.json\"",
                 incident.id
             )) {
-                response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
+                response
+                    .headers_mut()
+                    .insert(header::CONTENT_DISPOSITION, value);
             }
             response
         }
@@ -180,7 +185,9 @@ async fn export_incident_markdown(
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     let body = export::render_markdown(&incident);
@@ -193,19 +200,20 @@ async fn export_incident_markdown(
         "attachment; filename=\"{}-incident.md\"",
         incident.id
     )) {
-        response.headers_mut().insert(header::CONTENT_DISPOSITION, value);
+        response
+            .headers_mut()
+            .insert(header::CONTENT_DISPOSITION, value);
     }
     response
 }
 
-async fn get_incident_summary(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Response {
+async fn get_incident_summary(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     export::render_summary(&incident).into_response()
@@ -261,7 +269,9 @@ async fn generate_incident_explanation(
     let incident = match storage::read_incident(&state.state_dir, &id) {
         Ok(Some(incident)) => incident,
         Ok(None) => return (StatusCode::NOT_FOUND, "incident not found").into_response(),
-        Err(error) => return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        Err(error) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+        }
     };
 
     if !force_refresh {
@@ -271,14 +281,19 @@ async fn generate_incident_explanation(
     }
 
     match llm::explain_incident(&incident).await {
-        Ok(explanation) => match storage::update_incident_explanation(&state.state_dir, &incident.id, &explanation) {
-            Ok(Some(updated)) => Json(ExplainResponse {
-                explanation: updated.cached_explanation.unwrap_or(explanation),
-            })
-            .into_response(),
-            Ok(None) => Json(ExplainResponse { explanation }).into_response(),
-            Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
-        },
+        Ok(explanation) => {
+            match storage::update_incident_explanation(&state.state_dir, &incident.id, &explanation)
+            {
+                Ok(Some(updated)) => Json(ExplainResponse {
+                    explanation: updated.cached_explanation.unwrap_or(explanation),
+                })
+                .into_response(),
+                Ok(None) => Json(ExplainResponse { explanation }).into_response(),
+                Err(error) => {
+                    (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+                }
+            }
+        }
         Err(error) => (StatusCode::BAD_GATEWAY, error.to_string()).into_response(),
     }
 }
@@ -317,13 +332,29 @@ fn run_demo_scenario(state_dir: &std::path::Path, scenario: &str) -> anyhow::Res
         let degraded = i >= 35;
         let (error_rate, latency, signature) = match scenario {
             "payments-latency" => (
-                if degraded { 0.045 + ((i % 2) as f64 * 0.006) } else { 0.012 },
-                if degraded { 345.0 + ((i % 3) as f64 * 24.0) } else { 124.0 },
+                if degraded {
+                    0.045 + ((i % 2) as f64 * 0.006)
+                } else {
+                    0.012
+                },
+                if degraded {
+                    345.0 + ((i % 3) as f64 * 24.0)
+                } else {
+                    124.0
+                },
                 "Payment provider timeout while authorizing card 4242 request 8f91ab22",
             ),
             _ => (
-                if degraded { 0.108 + ((i % 3) as f64 * 0.01) } else { 0.013 },
-                if degraded { 265.0 + ((i % 2) as f64 * 28.0) } else { 121.0 },
+                if degraded {
+                    0.108 + ((i % 3) as f64 * 0.01)
+                } else {
+                    0.013
+                },
+                if degraded {
+                    265.0 + ((i % 2) as f64 * 28.0)
+                } else {
+                    121.0
+                },
                 "Database timeout while loading checkout session user 123 request 8f91ab22",
             ),
         };
