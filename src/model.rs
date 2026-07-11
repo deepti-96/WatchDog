@@ -105,6 +105,10 @@ pub struct IncidentListItem {
     pub summary: String,
     pub deploy_id: String,
     pub environment: String,
+    pub seconds_after_deploy: i64,
+    pub error_rate_delta: f64,
+    pub latency_delta_ms: f64,
+    pub top_error_count: usize,
     pub has_cached_explanation: bool,
     pub status: String,
     pub has_notes: bool,
@@ -119,6 +123,10 @@ impl Incident {
             summary: self.summary.clone(),
             deploy_id: self.verdict.deploy_id.clone(),
             environment: self.verdict.environment.clone(),
+            seconds_after_deploy: self.verdict.seconds_after_deploy,
+            error_rate_delta: self.verdict.error_rate_delta,
+            latency_delta_ms: self.verdict.latency_delta_ms,
+            top_error_count: self.verdict.top_error_count,
             has_cached_explanation: self.cached_explanation.is_some(),
             status: self.status.clone(),
             has_notes: !self.notes.trim().is_empty(),
@@ -180,5 +188,48 @@ mod tests {
         assert_eq!(incident.notes, "");
         assert!(incident.cached_explanation.is_none());
         assert!(incident.cached_explanation_updated_at.is_none());
+    }
+
+    #[test]
+    fn list_item_includes_detection_summary_fields() {
+        let incident = Incident {
+            id: "incident-1".to_string(),
+            created_at: Utc::now(),
+            severity: "high".to_string(),
+            summary: "checkout regression".to_string(),
+            verdict: RegressionVerdict {
+                deploy_id: "v1.2.3".to_string(),
+                environment: "production".to_string(),
+                deploy_timestamp: Utc::now(),
+                detected_at: Utc::now(),
+                seconds_after_deploy: 42,
+                error_rate_delta: 0.082,
+                latency_delta_ms: 143.2,
+                reason: "error rate shifted above baseline".to_string(),
+                top_error_signature: Some("api: database timeout".to_string()),
+                top_error_count: 7,
+                top_error_is_new: true,
+                comparison: IncidentMetricComparison {
+                    baseline_error_rate: 0.012,
+                    detected_error_rate: 0.094,
+                    baseline_latency_ms: 118.0,
+                    detected_latency_ms: 261.2,
+                    request_rate_at_detection: 405.0,
+                },
+                timeline: Vec::new(),
+            },
+            alert_text: "watchdog detected a regression".to_string(),
+            cached_explanation: None,
+            cached_explanation_updated_at: None,
+            status: INCIDENT_STATUS_OPEN.to_string(),
+            notes: String::new(),
+        };
+
+        let item = incident.list_item();
+
+        assert_eq!(item.seconds_after_deploy, 42);
+        assert_eq!(item.error_rate_delta, 0.082);
+        assert_eq!(item.latency_delta_ms, 143.2);
+        assert_eq!(item.top_error_count, 7);
     }
 }
