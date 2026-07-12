@@ -1,19 +1,19 @@
 # WatchDog
 
-Release regression detection for engineering teams.
+Deploy regression detection for engineering teams.
 
 `WatchDog` answers one question after every deploy: `did this release break something?`
 It correlates a deploy event with post-deploy changes in error rate, latency, and log signatures, then saves a triage-ready incident with evidence, notes, exports, and an explanation.
-The hosted Vercel demo also runs an evidence-bounded triage agent automatically after each deploy event and persists the agent report to Supabase.
 
 The intended user is an on-call engineer, platform engineer, or engineering manager who needs to understand whether a release caused customer-facing risk without reading raw metrics and logs first.
 
-## Why this is a strong Rust project
+## Why this is a production engineering project
 
 - Solves a real production problem that every backend team understands
 - Uses Rust for a low-overhead, always-on streaming process
 - Demonstrates event correlation, rolling baselines, anomaly detection, and alerting
 - Produces measurable benchmark output instead of vague claims
+- Keeps automated explanations evidence-bounded; rollback remains human-approved
 
 ## What it does
 
@@ -24,7 +24,6 @@ The intended user is an on-call engineer, platform engineer, or engineering mana
 - Attributes suspicious shifts and repeated new error signatures to a specific deploy
 - Persists incident records with status, notes, explanation cache, and export endpoints
 - Serves a product dashboard for incident review and deploy-event demos
-- Runs autonomous deploy triage in the hosted demo: detect, explain, recommend, prepare a rollback decision brief, and store the audit trail
 - Emits a human-readable verdict to stdout, webhook, and the dashboard
 
 ## Flow
@@ -56,6 +55,8 @@ flowchart TD
 - [`src/dashboard.rs`](./src/dashboard.rs): hosted dashboard, health endpoint, incident APIs, and demo scenario trigger
 - [`src/storage.rs`](./src/storage.rs): durable incident persistence with Supabase, SQLite, and JSON-file modes
 
+For production readiness notes, limitations, and next-step integrations, see [`docs/production-readiness.md`](./docs/production-readiness.md).
+
 ## Quick start
 
 Create a ready-to-demo bad deploy incident:
@@ -79,14 +80,14 @@ For hosted demos, see [`docs/deployment.md`](./docs/deployment.md):
 - Dockerized Rust dashboard for Render, Railway, Fly.io, or any Docker host
 - Deployment notes for persistent state and lightweight explanations
 
-## Interview demo script
+## 5-minute technical walkthrough
 
-1. Open the hosted Vercel dashboard and point out that Supabase is connected in the sidebar health chip.
-2. Click `Deploy Checkout API` or `Deploy Payments API` to trigger a production deploy event.
-3. Show the autonomous run: WatchDog receives the deploy event, compares against the previous stable baseline, detects the regression, generates an explanation, runs triage, and stores the incident.
-4. Walk through the evidence cards: detection delay, error signature, request rate, error-rate delta, and latency delta.
-5. Show the triage agent and rollback decision brief, then explain that rollback is recommended but deliberately human-approved.
-6. Add an investigation note, mark the incident resolved, refresh, and show that the state persists.
+1. Start with the production reliability problem: a deploy happens, and the on-call engineer needs fast evidence on whether it caused a regression.
+2. Show `src/engine.rs`: deploy events snapshot the rolling baseline and open a bounded monitoring window.
+3. Show `src/detector.rs`: CUSUM detects sustained error-rate or latency shifts instead of one noisy sample.
+4. Show the incident evidence: deploy id, detection delay, metric deltas, dominant log signature, timeline, notes, status, and exports.
+5. Explain the production path: JSONL is the local MVP ingestion source, and Prometheus/OpenTelemetry/deploy webhooks can replace it without changing the detection engine.
+6. Close with testability: `cargo test` covers detector behavior, deploy attribution, config, parsing, alert rendering, exports, benchmark scenarios, and demo persistence.
 
 The live dashboard exposes `GET /healthz` for deployment checks.
 Environment examples are in [`.env.example`](./.env.example).
