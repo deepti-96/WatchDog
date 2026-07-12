@@ -304,7 +304,6 @@ fn supabase_url() -> Result<String> {
 fn supabase_key() -> Result<String> {
     env::var("SUPABASE_SERVICE_ROLE_KEY")
         .or_else(|_| env::var("SUPABASE_SERVICE_KEY"))
-        .or_else(|_| env::var("SUPABASE_ANON_KEY"))
         .context("SUPABASE_SERVICE_ROLE_KEY is required when WATCHDOG_STORAGE=supabase")
 }
 
@@ -448,4 +447,24 @@ fn incidents_dir(state_dir: &Path) -> PathBuf {
 
 fn incident_path(state_dir: &Path, incident_id: &str) -> PathBuf {
     incidents_dir(state_dir).join(format!("{}.json", incident_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn supabase_key_does_not_use_public_anon_key() {
+        std::env::remove_var("SUPABASE_SERVICE_ROLE_KEY");
+        std::env::remove_var("SUPABASE_SERVICE_KEY");
+        std::env::set_var("SUPABASE_ANON_KEY", "anon-key");
+
+        let error = supabase_key().expect_err("anon key should not be accepted");
+
+        assert!(error
+            .to_string()
+            .contains("SUPABASE_SERVICE_ROLE_KEY is required"));
+
+        std::env::remove_var("SUPABASE_ANON_KEY");
+    }
 }

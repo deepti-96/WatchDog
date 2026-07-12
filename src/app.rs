@@ -4,7 +4,7 @@ use crate::cli::{Cli, Command};
 use crate::config::WatchdogConfig;
 use crate::dashboard;
 use crate::engine::{EngineConfig, WatchdogEngine};
-use crate::model::{DeployEvent, LogEvent, MetricSample};
+use crate::model::{DeployEvent, LogEvent, MetricSample, RegressionVerdict};
 use crate::storage;
 use crate::tail::LogTailer;
 use anyhow::{anyhow, Context, Result};
@@ -110,35 +110,23 @@ async fn run_daemon(
     );
 
     loop {
-        for sample in read_new_jsonl::<MetricSample>(&metrics_path, &mut metric_cursor)? {
-            if let Some(verdict) = engine.ingest_metric(sample) {
-                let message = alert::render(&verdict);
-                println!("{message}");
-                if let Some(url) = &settings.webhook_url {
-                    if let Err(error) = alert::send_webhook(url, &message, &verdict).await {
-                        warn!("failed to send webhook alert: {error:#}");
-                    }
+        let samples = read_new_jsonl::<MetricSample>(&metrics_path, &mut metric_cursor)?;
+        let deploys = read_new_jsonl::<DeployEvent>(&deploys_path, &mut deploy_cursor)?;
+        for verdict in ingest_metrics_and_deploys(&mut engine, samples, deploys) {
+            let message = alert::render(&verdict);
+            println!("{message}");
+            if let Some(url) = &settings.webhook_url {
+                if let Err(error) = alert::send_webhook(url, &message, &verdict).await {
+                    warn!("failed to send webhook alert: {error:#}");
                 }
-                if let Err(error) = storage::persist_incident(&state_dir, &verdict, &message) {
-                    warn!("failed to persist incident: {error:#}");
-                }
+            }
+            if let Err(error) = storage::persist_incident(&state_dir, &verdict, &message) {
+                warn!("failed to persist incident: {error:#}");
             }
         }
 
         for log in tailer.read_new_events()? {
             engine.ingest_log(log);
-        }
-
-        for deploy in read_new_jsonl::<DeployEvent>(&deploys_path, &mut deploy_cursor)? {
-            if engine.mark_deploy(deploy.clone()) {
-                info!(
-                    "armed deploy correlation for {} with baseline of {} samples",
-                    deploy.deploy_id,
-                    engine.baseline_size()
-                );
-            } else {
-                warn!("ignoring deploy event because baseline is not ready");
-            }
         }
 
         sleep(TokioDuration::from_millis(500)).await;
@@ -373,6 +361,47 @@ fn run_benchmark(trials: usize, monitoring_window_secs: u64) -> Result<()> {
     Ok(())
 }
 
+fn ingest_metrics_and_deploys(
+    engine: &mut WatchdogEngine,
+    mut samples: Vec<MetricSample>,
+    mut deploys: Vec<DeployEvent>,
+) -> Vec<RegressionVerdict> {
+    samples.sort_by_key(|sample| sample.timestamp);
+    deploys.sort_by_key(|deploy| deploy.timestamp);
+
+    let mut verdicts = Vec::new();
+    let mut deploy_index = 0usize;
+
+    for sample in samples {
+        while deploy_index < deploys.len() && deploys[deploy_index].timestamp <= sample.timestamp {
+            mark_deploy(engine, deploys[deploy_index].clone());
+            deploy_index += 1;
+        }
+
+        if let Some(verdict) = engine.ingest_metric(sample) {
+            verdicts.push(verdict);
+        }
+    }
+
+    for deploy in deploys.into_iter().skip(deploy_index) {
+        mark_deploy(engine, deploy);
+    }
+
+    verdicts
+}
+
+fn mark_deploy(engine: &mut WatchdogEngine, deploy: DeployEvent) {
+    if engine.mark_deploy(deploy.clone()) {
+        info!(
+            "armed deploy correlation for {} with baseline of {} samples",
+            deploy.deploy_id,
+            engine.baseline_size()
+        );
+    } else {
+        warn!("ignoring deploy event because baseline is not ready");
+    }
+}
+
 fn ensure_state_dir(path: &Path) -> Result<()> {
     fs::create_dir_all(path)
         .with_context(|| format!("failed to create state dir {}", path.display()))?;
@@ -431,14 +460,33 @@ where
         *cursor = 0;
     }
 
-    for line in lines.iter().skip(*cursor) {
+    let mut consumed_lines = *cursor;
+    for (index, line) in lines.iter().enumerate().skip(*cursor) {
         if line.trim().is_empty() {
+            consumed_lines = index + 1;
             continue;
         }
-        out.push(serde_json::from_str(line)?);
+
+        match serde_json::from_str(line) {
+            Ok(record) => {
+                out.push(record);
+                consumed_lines = index + 1;
+            }
+            Err(error) if index + 1 == lines.len() => {
+                warn!(
+                    "leaving trailing partial JSONL record unread in {}: {error}",
+                    path.display()
+                );
+                break;
+            }
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("failed to parse JSONL line {}", index + 1));
+            }
+        }
     }
 
-    *cursor = lines.len();
+    *cursor = consumed_lines;
     Ok(out)
 }
 
@@ -503,6 +551,64 @@ mod tests {
         assert_eq!(cursor, 1);
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn read_new_jsonl_leaves_trailing_partial_record_unread() {
+        let path = temp_path("partial-line");
+        fs::write(&path, "{\"value\":1}\n{\"value\":").expect("write partial jsonl");
+
+        let mut cursor = 0;
+        let records =
+            read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read complete records");
+
+        assert_eq!(records, vec![JsonlTestRecord { value: 1 }]);
+        assert_eq!(cursor, 1);
+
+        fs::write(&path, "{\"value\":1}\n{\"value\":2}\n").expect("complete jsonl");
+        let records =
+            read_new_jsonl::<JsonlTestRecord>(&path, &mut cursor).expect("read completed record");
+
+        assert_eq!(records, vec![JsonlTestRecord { value: 2 }]);
+        assert_eq!(cursor, 2);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn metrics_and_deploys_are_ingested_in_timestamp_order() {
+        let mut engine = WatchdogEngine::new(64, 300);
+        let start = Utc::now();
+        let mut samples = Vec::new();
+
+        for i in 0..20 {
+            samples.push(MetricSample {
+                timestamp: start + Duration::seconds(i),
+                error_rate: 0.01,
+                p95_latency_ms: 110.0,
+                request_rate: 400.0,
+            });
+        }
+
+        samples.push(MetricSample {
+            timestamp: start + Duration::seconds(24),
+            error_rate: 0.12,
+            p95_latency_ms: 280.0,
+            request_rate: 405.0,
+        });
+
+        let verdicts = ingest_metrics_and_deploys(
+            &mut engine,
+            samples,
+            vec![DeployEvent {
+                timestamp: start + Duration::seconds(21),
+                deploy_id: "v-ordering".to_string(),
+                environment: "test".to_string(),
+            }],
+        );
+
+        assert_eq!(verdicts.len(), 1);
+        assert_eq!(verdicts[0].deploy_id, "v-ordering");
     }
 
     #[test]

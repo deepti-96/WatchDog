@@ -16,6 +16,10 @@ impl RingBuffer {
     }
 
     pub fn push(&mut self, sample: MetricSample) {
+        if self.cap == 0 {
+            return;
+        }
+
         if self.samples.len() == self.cap {
             self.samples.pop_front();
         }
@@ -44,5 +48,53 @@ impl RingBuffer {
             p95_latency_mean: latency_sum / count as f64,
             sample_count: count,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn sample() -> MetricSample {
+        MetricSample {
+            timestamp: Utc::now(),
+            error_rate: 0.01,
+            p95_latency_ms: 120.0,
+            request_rate: 400.0,
+        }
+    }
+
+    #[test]
+    fn zero_capacity_buffer_does_not_store_samples() {
+        let mut buffer = RingBuffer::new(0);
+
+        buffer.push(sample());
+
+        assert_eq!(buffer.len(), 0);
+        assert!(buffer.baseline().is_none());
+    }
+
+    #[test]
+    fn buffer_keeps_only_the_latest_samples() {
+        let mut buffer = RingBuffer::new(2);
+
+        buffer.push(MetricSample {
+            error_rate: 0.01,
+            ..sample()
+        });
+        buffer.push(MetricSample {
+            error_rate: 0.03,
+            ..sample()
+        });
+        buffer.push(MetricSample {
+            error_rate: 0.05,
+            ..sample()
+        });
+
+        let baseline = buffer.baseline().expect("baseline");
+        assert_eq!(buffer.len(), 2);
+        assert_eq!(baseline.sample_count, 2);
+        assert!((baseline.error_rate_mean - 0.04).abs() < f64::EPSILON);
     }
 }

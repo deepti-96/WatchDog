@@ -1851,6 +1851,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
           knownIncidentIds = new Set(incidents.map((incident) => incident.id));
           lastSyncedAt = new Date();
           refreshDelayMs = BASE_REFRESH_INTERVAL_MS;
+          await loadHealth();
           renderSidebarStats();
           renderSystemHealth();
           renderIncidentList();
@@ -2526,7 +2527,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       }
 
       try {
-        const response = await fetch(`/api/incidents/${id}`);
+        const response = await fetch(`/api/incidents/${encodeURIComponent(id)}`);
         if (!response.ok) {
           throw new Error(await response.text());
         }
@@ -2618,8 +2619,8 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
             <button class="button button-secondary" onclick="loadIncidents()">Refresh Incidents</button>
             <button class="button button-secondary" onclick="copyIncidentLink('${incident.id}')">Copy Link</button>
             <button class="button button-secondary" onclick="copyIncidentSummary('${incident.id}')">Copy Summary</button>
-            <a class="refresh-link" href="/api/incidents/${incident.id}/export/markdown">Download Markdown</a>
-            <a class="refresh-link" href="/api/incidents/${incident.id}/export/json">Download JSON</a>
+            <a class="refresh-link" href="/api/incidents/${encodeURIComponent(incident.id)}/export/markdown">Download Markdown</a>
+            <a class="refresh-link" href="/api/incidents/${encodeURIComponent(incident.id)}/export/json">Download JSON</a>
           </div>
         </section>
 
@@ -2817,7 +2818,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     async function copyIncidentSummary(id) {
       try {
-        const response = await fetch(`/api/incidents/${id}/summary`);
+        const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/summary`);
         if (!response.ok) {
           throw new Error(await response.text());
         }
@@ -2837,45 +2838,55 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
 
     async function setIncidentStatus(id, status) {
       const requestVersion = detailRequestVersion;
-      const response = await fetch(`/api/incidents/${id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
+      try {
+        const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
 
-      const incident = await response.json();
-      clearNotesDraft(id);
-      await loadIncidents({ silent: true });
-      if (!isLatestDetailRequest(id, requestVersion)) {
-        return;
+        const incident = await response.json();
+        clearNotesDraft(id);
+        await loadIncidents({ silent: true });
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
+        renderDetail(incident, incident.cached_explanation, false, null);
+        showToast(`Incident marked ${status}.`);
+      } catch (error) {
+        showToast(`Could not update incident status. ${error.message || String(error)}`, 'warning');
       }
-      renderDetail(incident, incident.cached_explanation, false, null);
     }
 
     async function saveIncidentNotes(id) {
       const requestVersion = detailRequestVersion;
       const notes = document.getElementById('incident-notes')?.value || '';
-      const response = await fetch(`/api/incidents/${id}/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
-      });
+      try {
+        const response = await fetch(`/api/incidents/${encodeURIComponent(id)}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes }),
+        });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
 
-      const incident = await response.json();
-      clearNotesDraft(id);
-      await loadIncidents({ silent: true });
-      if (!isLatestDetailRequest(id, requestVersion)) {
-        return;
+        const incident = await response.json();
+        clearNotesDraft(id);
+        await loadIncidents({ silent: true });
+        if (!isLatestDetailRequest(id, requestVersion)) {
+          return;
+        }
+        renderDetail(incident, incident.cached_explanation, false, null);
+        showToast('Investigation notes saved.');
+      } catch (error) {
+        showToast(`Could not save notes. ${error.message || String(error)}`, 'warning');
       }
-      renderDetail(incident, incident.cached_explanation, false, null);
     }
 
     async function regenerateExplanation(id) {
@@ -2883,7 +2894,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const requestVersion = detailRequestVersion;
       isExplainingIncident = true;
       try {
-        const incidentResponse = await fetch(`/api/incidents/${id}`);
+        const incidentResponse = await fetch(`/api/incidents/${encodeURIComponent(id)}`);
         if (!incidentResponse.ok) {
           throw new Error(await incidentResponse.text());
         }
@@ -2893,7 +2904,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         }
         renderDetail(incident, null, true, null);
 
-        const explainResponse = await fetch(`/api/incidents/${id}/explain/refresh`, { method: 'POST' });
+        const explainResponse = await fetch(`/api/incidents/${encodeURIComponent(id)}/explain/refresh`, { method: 'POST' });
         const body = await explainResponse.text();
         if (!isLatestDetailRequest(id, requestVersion)) {
           return;
@@ -2924,7 +2935,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
       const requestVersion = detailRequestVersion;
       isExplainingIncident = true;
       try {
-        const incidentResponse = await fetch(`/api/incidents/${id}`);
+        const incidentResponse = await fetch(`/api/incidents/${encodeURIComponent(id)}`);
         if (!incidentResponse.ok) {
           throw new Error(await incidentResponse.text());
         }
@@ -2934,7 +2945,7 @@ const INDEX_HTML: &str = r#"<!DOCTYPE html>
         }
         renderDetail(incident, null, true, null);
 
-        const explainResponse = await fetch(`/api/incidents/${id}/explain`, { method: 'POST' });
+        const explainResponse = await fetch(`/api/incidents/${encodeURIComponent(id)}/explain`, { method: 'POST' });
         const body = await explainResponse.text();
         if (!isLatestDetailRequest(id, requestVersion)) {
           return;
