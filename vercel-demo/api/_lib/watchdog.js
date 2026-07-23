@@ -91,6 +91,10 @@ function normalizeSignature(service, message) {
     .replace(/\b\d+\b/g, '<num>');
 }
 
+function ratioOrZero(numerator, denominator) {
+  return denominator > 0 ? numerator / denominator : 0;
+}
+
 function createScenarioIncident(scenario = 'checkout-timeout') {
   const now = Date.now();
   const patch = 20 + (Math.floor(now / 1000) % 70);
@@ -154,12 +158,8 @@ function createScenarioIncident(scenario = 'checkout-timeout') {
 function explainIncident(incident) {
   const verdict = incident.verdict;
   const comparison = verdict.comparison;
-  const errorMultiplier = comparison.baseline_error_rate > 0
-    ? comparison.detected_error_rate / comparison.baseline_error_rate
-    : 0;
-  const latencyMultiplier = comparison.baseline_latency_ms > 0
-    ? comparison.detected_latency_ms / comparison.baseline_latency_ms
-    : 0;
+  const errorMultiplier = ratioOrZero(comparison.detected_error_rate, comparison.baseline_error_rate);
+  const latencyMultiplier = ratioOrZero(comparison.detected_latency_ms, comparison.baseline_latency_ms);
   return `## Likely Issue
 Deploy \`${verdict.deploy_id}\` likely introduced a backend regression in \`${verdict.environment}\`. WatchDog detected \`${verdict.reason}\` ${verdict.seconds_after_deploy}s after the release.
 
@@ -180,12 +180,8 @@ High based on deploy timing, metric deltas, and log evidence.`;
 function buildAgentReport(incident) {
   const verdict = incident.verdict;
   const comparison = verdict.comparison;
-  const errorMultiplier = comparison.baseline_error_rate > 0
-    ? comparison.detected_error_rate / comparison.baseline_error_rate
-    : 0;
-  const latencyMultiplier = comparison.baseline_latency_ms > 0
-    ? comparison.detected_latency_ms / comparison.baseline_latency_ms
-    : 0;
+  const errorMultiplier = ratioOrZero(comparison.detected_error_rate, comparison.baseline_error_rate);
+  const latencyMultiplier = ratioOrZero(comparison.detected_latency_ms, comparison.baseline_latency_ms);
   const confidence = verdict.top_error_is_new && (errorMultiplier >= 4 || latencyMultiplier >= 2)
     ? 'high'
     : 'medium';
@@ -225,12 +221,8 @@ function buildAgentReport(incident) {
 function buildRollbackBrief(incident) {
   const verdict = incident.verdict;
   const comparison = verdict.comparison;
-  const errorMultiplier = comparison.baseline_error_rate > 0
-    ? comparison.detected_error_rate / comparison.baseline_error_rate
-    : 0;
-  const latencyMultiplier = comparison.baseline_latency_ms > 0
-    ? comparison.detected_latency_ms / comparison.baseline_latency_ms
-    : 0;
+  const errorMultiplier = ratioOrZero(comparison.detected_error_rate, comparison.baseline_error_rate);
+  const latencyMultiplier = ratioOrZero(comparison.detected_latency_ms, comparison.baseline_latency_ms);
   const rollbackRecommended = verdict.error_rate_delta >= 0.08
     || verdict.latency_delta_ms >= 200
     || errorMultiplier >= 5
