@@ -97,6 +97,11 @@
       line-height: 1.7;
     }
 
+    .stack-sm { margin-top: 6px; }
+    .stack-md { margin-top: 10px; }
+    .stack-lg { margin-top: 12px; }
+    .stack-xl { margin-top: 14px; }
+
     .scenario-card, .workflow-step {
       padding: 14px;
     }
@@ -375,7 +380,7 @@
       <div>
         <div class="eyebrow">Release safety</div>
         <h1>watchdog</h1>
-        <p class="brand-copy" style="margin-top: 14px;">A production release monitor for engineering teams. WatchDog compares a new deploy against the previous stable baseline and persists any regression evidence in Supabase.</p>
+        <p class="brand-copy stack-xl">A production release monitor for engineering teams. WatchDog compares a new deploy against the previous stable baseline and persists any regression evidence in Supabase.</p>
       </div>
 
       <section class="panel scenario-card">
@@ -391,8 +396,8 @@
       <section class="panel scenario-card">
         <div class="label">Autonomous release monitor</div>
         <h3>Trigger production deploy event</h3>
-        <p class="meta" style="margin-top: 6px;">The deploy event runs the monitor and triage agent without presenter steps. Rollback stays human-approved.</p>
-        <div class="scenario-actions" style="margin-top: 12px;">
+        <p class="meta stack-sm">The deploy event runs the monitor and triage agent without presenter steps. Rollback stays human-approved.</p>
+        <div class="scenario-actions stack-lg">
           <button id="checkout-button" class="button button-primary">Deploy Checkout API</button>
           <button id="payments-button" class="button">Deploy Payments API</button>
         </div>
@@ -594,9 +599,9 @@
             ${badge('deploy', incident.environment)}
             ${incident.has_agent_report ? badge('deploy', 'agent reviewed') : ''}
           </div>
-          <h3 style="margin-top: 10px;">${escapeHtml(incident.deploy_id)}</h3>
+          <h3 class="stack-md">${escapeHtml(incident.deploy_id)}</h3>
           <p class="meta">${new Date(incident.created_at).toLocaleString()}</p>
-          <p class="meta" style="margin-top: 8px;">${escapeHtml(incident.summary)}</p>
+          <p class="meta stack-md">${escapeHtml(incident.summary)}</p>
         </article>
       `).join('');
     }
