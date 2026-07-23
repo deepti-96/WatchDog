@@ -631,8 +631,8 @@
               ${incident.autonomous_run ? badge('deploy', 'autonomous triage') : ''}
               ${incident.rollback_brief ? badge('deploy', incident.rollback_brief.decision) : ''}
             </div>
-            <h2 style="margin-top: 14px;">${escapeHtml(incident.summary)}</h2>
-            <p class="muted" style="margin-top: 12px;">WatchDog accepted the deploy event, compared the release against the previous stable baseline, generated the explanation and triage report, then persisted the incident in Supabase.</p>
+            <h2 class="stack-xl">${escapeHtml(incident.summary)}</h2>
+            <p class="muted stack-lg">WatchDog accepted the deploy event, compared the release against the previous stable baseline, generated the explanation and triage report, then persisted the incident in Supabase.</p>
           </div>
           <div class="actions">
             <button class="button button-primary" onclick="explainIncident('${incident.id}')">Regenerate Explanation</button>
@@ -659,7 +659,7 @@
         <section class="section-grid">
           <article class="panel section">
             <div class="label">Incident Timeline</div>
-            <div class="timeline" style="margin-top: 14px;">
+            <div class="timeline stack-xl">
               ${verdict.timeline.map((event) => `
                 <div class="timeline-item">
                   <strong>${escapeHtml(event.label)}</strong>
@@ -671,33 +671,33 @@
           <article class="panel section">
             <div class="label">Investigation Notes</div>
             <textarea id="notes">${escapeHtml(incident.notes || '')}</textarea>
-            <button class="button" style="margin-top: 10px;" onclick="saveNotes('${incident.id}')">Save Notes</button>
+            <button class="button stack-md" onclick="saveNotes('${incident.id}')">Save Notes</button>
           </article>
         </section>
 
         <section class="panel section">
           <div class="label">Detector Verdict</div>
-          <pre style="margin-top: 12px;">${escapeHtml(incident.alert_text)}</pre>
+          <pre class="stack-lg">${escapeHtml(incident.alert_text)}</pre>
         </section>
 
         <section class="panel section">
           <div class="label">Autonomous Run</div>
-          <div style="margin-top: 12px;">${renderAutonomousRun(incident.autonomous_run)}</div>
+          <div class="stack-lg">${renderAutonomousRun(incident.autonomous_run)}</div>
         </section>
 
         <section class="panel section">
           <div class="label">Evidence Explanation</div>
-          <pre id="explanation" style="margin-top: 12px;">${escapeHtml(incident.cached_explanation || 'Generated automatically for new deploy events. Use Regenerate Explanation for older records.')}</pre>
+          <pre id="explanation" class="stack-lg">${escapeHtml(incident.cached_explanation || 'Generated automatically for new deploy events. Use Regenerate Explanation for older records.')}</pre>
         </section>
 
         <section class="panel section">
           <div class="label">Triage Agent</div>
-          <div id="agent-report" style="margin-top: 12px;">${renderAgentReport(incident.agent_report)}</div>
+          <div id="agent-report" class="stack-lg">${renderAgentReport(incident.agent_report)}</div>
         </section>
 
         <section class="panel section">
           <div class="label">Rollback Decision Brief</div>
-          <div id="rollback-brief" style="margin-top: 12px;">${renderRollbackBrief(incident.rollback_brief)}</div>
+          <div id="rollback-brief" class="stack-lg">${renderRollbackBrief(incident.rollback_brief)}</div>
         </section>
       `;
     }
