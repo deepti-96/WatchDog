@@ -66,6 +66,8 @@ For production readiness notes, limitations, and next-step integrations, see [`d
 
 ## Quick start
 
+### Local Rust dashboard
+
 Create a ready-to-demo bad deploy incident:
 
 ```bash
@@ -80,6 +82,8 @@ Open `http://127.0.0.1:3001`, then use the dashboard to:
 - Generate or refresh the explanation
 - Add investigation notes and mark the incident resolved
 - Export Markdown or JSON for handoff
+
+### Hosted Vercel demo
 
 For hosted demos, see [`docs/deployment.md`](./docs/deployment.md):
 
