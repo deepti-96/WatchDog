@@ -7,6 +7,22 @@ const ROLLBACK_ERROR_DELTA_THRESHOLD = 0.08;
 const ROLLBACK_LATENCY_DELTA_MS_THRESHOLD = 200;
 const ROLLBACK_ERROR_MULTIPLIER_THRESHOLD = 5;
 const ROLLBACK_LATENCY_MULTIPLIER_THRESHOLD = 2;
+const SCENARIOS = {
+  'checkout-timeout': {
+    service: 'checkout-api',
+    raw_message: 'Database timeout while loading checkout session user 123 request 8f91ab22 after release v3.2',
+    detected_error_rate: 0.128,
+    detected_latency_ms: 293.0,
+    reason: 'error rate and latency shifted above baseline',
+  },
+  'payments-latency': {
+    service: 'payments-api',
+    raw_message: 'Payment provider timeout while authorizing card 4242 request 8f91ab22 after release v3.2',
+    detected_error_rate: 0.051,
+    detected_latency_ms: 393.0,
+    reason: 'latency shifted above baseline',
+  },
+};
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -100,6 +116,7 @@ function ratioOrZero(numerator, denominator) {
 }
 
 function createScenarioIncident(scenario = 'checkout-timeout') {
+  const fixture = SCENARIOS[scenario] || SCENARIOS['checkout-timeout'];
   const now = Date.now();
   const patch = 20 + (Math.floor(now / 1000) % 70);
   const deployId = `v3.2.${patch}`;
@@ -107,17 +124,13 @@ function createScenarioIncident(scenario = 'checkout-timeout') {
   const environment = DEMO_ENVIRONMENT;
   const deployAt = new Date(now + 31_000);
   const detectedAt = new Date(now + 35_000);
-  const isPayments = scenario === 'payments-latency';
-  const service = isPayments ? 'payments-api' : 'checkout-api';
-  const rawMessage = isPayments
-    ? 'Payment provider timeout while authorizing card 4242 request 8f91ab22 after release v3.2'
-    : 'Database timeout while loading checkout session user 123 request 8f91ab22 after release v3.2';
-  const signature = normalizeSignature(service, rawMessage);
+  const service = fixture.service;
+  const signature = normalizeSignature(service, fixture.raw_message);
   const baselineErrorRate = 0.012;
-  const detectedErrorRate = isPayments ? 0.051 : 0.128;
+  const detectedErrorRate = fixture.detected_error_rate;
   const baselineLatencyMs = 117.7;
-  const detectedLatencyMs = isPayments ? 393.0 : 293.0;
-  const reason = isPayments ? 'latency shifted above baseline' : 'error rate and latency shifted above baseline';
+  const detectedLatencyMs = fixture.detected_latency_ms;
+  const reason = fixture.reason;
   const id = `${Math.floor(detectedAt.getTime() / 1000)}-${deployId.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}`;
   const verdict = {
     deploy_id: deployId,
