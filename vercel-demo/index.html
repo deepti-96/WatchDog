@@ -200,6 +200,18 @@
       font-size: 0.9rem;
     }
 
+    .error-banner {
+      display: none;
+      padding: 12px 14px;
+      border: 1px solid rgba(255, 154, 134, 0.35);
+      border-radius: 8px;
+      background: rgba(255, 154, 134, 0.1);
+      color: var(--danger);
+      line-height: 1.5;
+    }
+
+    .error-banner.visible { display: block; }
+
     .stat-grid, .signal-grid, .overview-grid {
       display: grid;
       gap: 12px;
@@ -424,6 +436,8 @@
         <button class="button" onclick="loadIncidents()">Refresh</button>
       </div>
 
+      <div id="error-banner" class="error-banner" role="status"></div>
+
       <section class="stat-grid">
         <article class="card"><div class="label">Incidents</div><strong id="incident-count">0</strong></article>
         <article class="card danger"><div class="label">High Severity</div><strong id="high-count">0</strong></article>
@@ -484,7 +498,20 @@
       if (!response.ok) {
         throw new Error(body?.error || text || response.statusText);
       }
+      clearError();
       return body;
+    }
+
+    function showError(message) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = message;
+      banner.classList.add('visible');
+    }
+
+    function clearError() {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = '';
+      banner.classList.remove('visible');
     }
 
     async function checkHealth() {
@@ -518,6 +545,7 @@
         }
         checkHealth();
       } catch (error) {
+        showError(error.message);
         document.getElementById('incident-list').innerHTML = `<div class="panel empty">${escapeHtml(error.message)}</div>`;
         renderEmpty(error.message);
       }
@@ -546,7 +574,7 @@
         activeIncidentId = result.incident_id;
         await loadIncidents();
       } catch (error) {
-        alert(error.message);
+        showError(error.message);
       } finally {
         setScenarioButtons(false);
       }
