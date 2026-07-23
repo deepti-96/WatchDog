@@ -666,7 +666,7 @@
             <button class="button button-primary" onclick="explainIncident('${incident.id}')">Regenerate Explanation</button>
             <button class="button" onclick="runAgent('${incident.id}')">Re-run Triage Agent</button>
             <button class="button" onclick="loadIncidents()">Refresh Incidents</button>
-            <button class="button" onclick="copySummary('${incident.id}')">Copy Summary</button>
+            <button id="copy-button" class="button" onclick="copySummary('${incident.id}')">Copy Summary</button>
             <button class="button" onclick="setStatus('${incident.id}', '${incident.status === 'open' ? 'resolved' : 'open'}')">${incident.status === 'open' ? 'Mark Resolved' : 'Mark Open'}</button>
           </div>
         </section>
@@ -769,6 +769,11 @@
         : '';
       const text = `${incident.summary}\n${incident.alert_text}${rollback}`;
       await navigator.clipboard.writeText(text);
+      const button = document.getElementById('copy-button');
+      if (button) {
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy Summary'; }, 1200);
+      }
     }
 
     function card(label, value, detail, tone = '') {
