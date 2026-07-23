@@ -36,13 +36,13 @@ Hosted endpoints:
 - `GET /api/healthz`: confirms API and Supabase connectivity
 - `GET /api/incidents`: returns incident history for the dashboard
 - `GET /api/incidents/:id`: returns one persisted incident
-- `POST /api/deployments/start`: accepts a deploy event, detects the regression, generates the explanation, runs the triage agent, and stores the incident
-- `POST /api/incidents/:id/agent`: re-runs the evidence-bounded triage agent for an existing record
+- `POST /api/deployments/start`: accepts a deploy event, detects the regression, generates the explanation, runs the triage agent, prepares the rollback brief, and stores the incident
+- `POST /api/incidents/:id/agent`: re-runs the evidence-bounded triage agent and rollback brief for an existing record
 - `POST /api/incidents/:id/explain`: regenerates the evidence explanation
 - `POST /api/incidents/:id/notes`: saves investigation notes
 - `POST /api/incidents/:id/status`: updates incident status
 
-The hosted demo does not run a long-lived Rust daemon. It uses Vercel serverless APIs for the public product workflow and Supabase as the durable database. The demo deploy/telemetry source is generated, while persistence, status, notes, explanations, and agent reports are real backend writes.
+The hosted demo does not run a long-lived Rust daemon. It uses Vercel serverless APIs for the public product workflow and Supabase as the durable database. The demo deploy/telemetry source is generated, while persistence, status, notes, explanations, agent reports, and rollback briefs are real backend writes.
 
 ## Hosted verification checklist
 
