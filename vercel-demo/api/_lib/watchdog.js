@@ -275,18 +275,19 @@ function buildRollbackBrief(incident) {
 }
 
 function autonomouslyTriageIncident(incident) {
+  const completedAt = new Date().toISOString();
   const triaged = {
     ...incident,
     cached_explanation: incident.cached_explanation || explainIncident(incident),
-    cached_explanation_updated_at: incident.cached_explanation_updated_at || new Date().toISOString(),
+    cached_explanation_updated_at: incident.cached_explanation_updated_at || completedAt,
   };
   triaged.agent_report = buildAgentReport(triaged);
-  triaged.agent_report_updated_at = new Date().toISOString();
+  triaged.agent_report_updated_at = completedAt;
   triaged.rollback_brief = buildRollbackBrief(triaged);
-  triaged.rollback_brief_updated_at = new Date().toISOString();
+  triaged.rollback_brief_updated_at = completedAt;
   triaged.autonomous_run = {
     mode: 'deploy-webhook',
-    completed_at: new Date().toISOString(),
+    completed_at: completedAt,
     actions: [
       'accepted production deploy event',
       'compared post-deploy health against previous stable baseline',
