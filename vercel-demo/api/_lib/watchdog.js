@@ -1,4 +1,8 @@
 const TABLE = 'incidents';
+const DEMO_ENVIRONMENT = 'production';
+const DETECTION_DELAY_SECONDS = 4;
+const PREVIOUS_RELEASE_STABLE_MINUTES = 10;
+const REQUEST_RATE_AT_DETECTION = 405.0;
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -92,7 +96,7 @@ function createScenarioIncident(scenario = 'checkout-timeout') {
   const patch = 20 + (Math.floor(now / 1000) % 70);
   const deployId = `v3.2.${patch}`;
   const previousDeployId = `v3.2.${patch - 1}`;
-  const environment = 'production';
+  const environment = DEMO_ENVIRONMENT;
   const deployAt = new Date(now + 31_000);
   const detectedAt = new Date(now + 35_000);
   const isPayments = scenario === 'payments-latency';
@@ -112,7 +116,7 @@ function createScenarioIncident(scenario = 'checkout-timeout') {
     environment,
     deploy_timestamp: deployAt.toISOString(),
     detected_at: detectedAt.toISOString(),
-    seconds_after_deploy: 4,
+    seconds_after_deploy: DETECTION_DELAY_SECONDS,
     error_rate_delta: detectedErrorRate - baselineErrorRate,
     latency_delta_ms: detectedLatencyMs - baselineLatencyMs,
     reason,
@@ -124,10 +128,10 @@ function createScenarioIncident(scenario = 'checkout-timeout') {
       detected_error_rate: detectedErrorRate,
       baseline_latency_ms: baselineLatencyMs,
       detected_latency_ms: detectedLatencyMs,
-      request_rate_at_detection: 405.0,
+      request_rate_at_detection: REQUEST_RATE_AT_DETECTION,
     },
     timeline: [
-      { label: 'Previous release stable', timestamp: new Date(now - 10 * 60_000).toISOString(), detail: `${previousDeployId} held baseline at ${(baselineErrorRate * 100).toFixed(1)}% errors and ${baselineLatencyMs.toFixed(1)}ms p95` },
+      { label: 'Previous release stable', timestamp: new Date(now - PREVIOUS_RELEASE_STABLE_MINUTES * 60_000).toISOString(), detail: `${previousDeployId} held baseline at ${(baselineErrorRate * 100).toFixed(1)}% errors and ${baselineLatencyMs.toFixed(1)}ms p95` },
       { label: 'Production deploy started', timestamp: deployAt.toISOString(), detail: `${deployId} promoted to ${environment} for ${service}` },
       { label: 'First dominant error', timestamp: detectedAt.toISOString(), detail: signature },
       { label: 'Regression detected', timestamp: detectedAt.toISOString(), detail: `${deployId} crossed the release guardrail: ${reason}` },
@@ -139,7 +143,7 @@ function createScenarioIncident(scenario = 'checkout-timeout') {
     severity: 'high',
     summary: `${deployId} regressed ${service} in production after ${previousDeployId} baseline`,
     verdict,
-    alert_text: `watchdog detected a production deployment regression: ${deployId} replaced stable ${previousDeployId} and triggered ${reason} 4s later. error rate moved from ${(baselineErrorRate * 100).toFixed(1)}% to ${(detectedErrorRate * 100).toFixed(1)}%; p95 latency moved from ${baselineLatencyMs.toFixed(1)}ms to ${detectedLatencyMs.toFixed(1)}ms. Dominant new error after deploy: '${signature}' seen 1 times.`,
+    alert_text: `watchdog detected a production deployment regression: ${deployId} replaced stable ${previousDeployId} and triggered ${reason} ${DETECTION_DELAY_SECONDS}s later. error rate moved from ${(baselineErrorRate * 100).toFixed(1)}% to ${(detectedErrorRate * 100).toFixed(1)}%; p95 latency moved from ${baselineLatencyMs.toFixed(1)}ms to ${detectedLatencyMs.toFixed(1)}ms. Dominant new error after deploy: '${signature}' seen 1 times.`,
     cached_explanation: null,
     cached_explanation_updated_at: null,
     status: 'open',
