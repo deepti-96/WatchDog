@@ -7,6 +7,13 @@ It correlates a deploy event with post-deploy changes in error rate, latency, an
 
 The intended user is an on-call engineer, platform engineer, or engineering manager who needs to understand whether a release caused customer-facing risk without reading raw metrics and logs first.
 
+## Tech stack
+
+- Core detector: Rust, CUSUM change detection, rolling baselines, JSONL ingestion, webhook alerts
+- Local dashboard service: Axum, SQLite or JSON-file storage, optional Ollama-backed explanations
+- Hosted demo: Vercel serverless functions, Supabase Postgres through PostgREST, HTML/CSS/JavaScript dashboard
+- Delivery: Docker for the Rust service, Vercel for the public product demo
+
 ## Why this is a production engineering project
 
 - Solves a real production problem that every backend team understands
