@@ -3,6 +3,10 @@ const DEMO_ENVIRONMENT = 'production';
 const DETECTION_DELAY_SECONDS = 4;
 const PREVIOUS_RELEASE_STABLE_MINUTES = 10;
 const REQUEST_RATE_AT_DETECTION = 405.0;
+const ROLLBACK_ERROR_DELTA_THRESHOLD = 0.08;
+const ROLLBACK_LATENCY_DELTA_MS_THRESHOLD = 200;
+const ROLLBACK_ERROR_MULTIPLIER_THRESHOLD = 5;
+const ROLLBACK_LATENCY_MULTIPLIER_THRESHOLD = 2;
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -185,7 +189,8 @@ function buildAgentReport(incident) {
   const confidence = verdict.top_error_is_new && (errorMultiplier >= 4 || latencyMultiplier >= 2)
     ? 'high'
     : 'medium';
-  const shouldRollback = verdict.error_rate_delta >= 0.08 || verdict.latency_delta_ms >= 200;
+  const shouldRollback = verdict.error_rate_delta >= ROLLBACK_ERROR_DELTA_THRESHOLD
+    || verdict.latency_delta_ms >= ROLLBACK_LATENCY_DELTA_MS_THRESHOLD;
   const action = shouldRollback
     ? 'Gate or roll back the release while the owning service checks the deploy diff.'
     : 'Keep the release under elevated watch and inspect traces for the dominant signature.';
@@ -223,10 +228,10 @@ function buildRollbackBrief(incident) {
   const comparison = verdict.comparison;
   const errorMultiplier = ratioOrZero(comparison.detected_error_rate, comparison.baseline_error_rate);
   const latencyMultiplier = ratioOrZero(comparison.detected_latency_ms, comparison.baseline_latency_ms);
-  const rollbackRecommended = verdict.error_rate_delta >= 0.08
-    || verdict.latency_delta_ms >= 200
-    || errorMultiplier >= 5
-    || latencyMultiplier >= 2;
+  const rollbackRecommended = verdict.error_rate_delta >= ROLLBACK_ERROR_DELTA_THRESHOLD
+    || verdict.latency_delta_ms >= ROLLBACK_LATENCY_DELTA_MS_THRESHOLD
+    || errorMultiplier >= ROLLBACK_ERROR_MULTIPLIER_THRESHOLD
+    || latencyMultiplier >= ROLLBACK_LATENCY_MULTIPLIER_THRESHOLD;
 
   return {
     generated_at: new Date().toISOString(),
