@@ -1,9 +1,9 @@
 # WatchDog
 
-Deploy regression detection for engineering teams.
+Autonomous deploy-regression detection for engineering teams.
 
 `WatchDog` answers one question after every deploy: `did this release break something?`
-It correlates a deploy event with post-deploy changes in error rate, latency, and log signatures, then saves a triage-ready incident with evidence, notes, exports, and an explanation.
+It correlates a deploy event with post-deploy changes in error rate, latency, and log signatures, then saves a triage-ready incident with evidence, notes, exports, an explanation, an agent triage report, and a rollback decision brief.
 
 The intended user is an on-call engineer, platform engineer, or engineering manager who needs to understand whether a release caused customer-facing risk without reading raw metrics and logs first.
 
@@ -29,7 +29,7 @@ The intended user is an on-call engineer, platform engineer, or engineering mana
 - Builds a rolling baseline from recent pre-deploy samples
 - Runs CUSUM change detection on error rate and latency
 - Attributes suspicious shifts and repeated new error signatures to a specific deploy
-- Persists incident records with status, notes, explanation cache, and export endpoints
+- Persists incident records with status, notes, explanation cache, triage reports, rollback briefs, and export endpoints
 - Serves a product dashboard for incident review and deploy-event demos
 - Emits a human-readable verdict to stdout, webhook, and the dashboard
 
