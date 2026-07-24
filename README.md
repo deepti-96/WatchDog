@@ -68,14 +68,14 @@ For production readiness notes, limitations, and next-step integrations, see [`d
 
 ### Local Rust dashboard
 
-Create a ready-to-demo bad deploy incident:
+Create a ready-to-demo bad deploy incident and serve the Rust dashboard:
 
 ```bash
 cargo run -- demo
 cargo run -- serve --state-dir .watchdog-demo --port 3001
 ```
 
-Open `http://127.0.0.1:3001`, then use the dashboard to:
+Open `http://127.0.0.1:3001`, then use the local dashboard to:
 
 - Run a checkout or payments deploy regression scenario from the sidebar
 - Select the saved incident from history
@@ -85,11 +85,11 @@ Open `http://127.0.0.1:3001`, then use the dashboard to:
 
 ### Hosted Vercel demo
 
-For hosted demos, see [`docs/deployment.md`](./docs/deployment.md):
+For the public hosted workflow, deploy `vercel-demo/` with Supabase configured. See [`docs/deployment.md`](./docs/deployment.md) for exact Vercel settings and environment variables.
 
 - Vercel hosted product demo from `vercel-demo/` with serverless APIs and Supabase persistence
-- Dockerized Rust dashboard for Render, Railway, Fly.io, or any Docker host
-- Deployment notes for persistent state and lightweight explanations
+- Autonomous deploy-event flow with explanation, triage report, and rollback brief generated server-side
+- Dockerized Rust dashboard path for Render, Railway, Fly.io, or any Docker host
 
 ## 5-minute technical walkthrough
 
